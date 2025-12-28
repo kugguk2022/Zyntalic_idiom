@@ -71,6 +71,24 @@ def start_server():
         print(f"CRITICAL SERVER ERROR: {e}")
 
 
+
+def wait_for_server(host: str, port: int, timeout: int = 10) -> bool:
+    print(f"Waiting for server at {host}:{port} to be ready...")
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(1)
+                if sock.connect_ex((host, port)) == 0:
+                    print("Server is ready!")
+                    return True
+        except Exception:
+            pass
+        time.sleep(0.5)
+    print("WARNING: Server startup timed out. The browser may fail to connect.")
+    return False
+
+
 def start_desktop():
     preflight_checks()
     ensure_port_available(HOST, PORT)
@@ -80,8 +98,8 @@ def start_desktop():
     server_thread.daemon = True
     server_thread.start()
 
-    # Wait a bit for the server to start
-    time.sleep(1)
+    # Wait for the server to be ready
+    wait_for_server("127.0.0.1", PORT, timeout=10)
 
     # Use localhost for the browser, even if we bind to 0.0.0.0 (all interfaces)
     browser_url = f"http://127.0.0.1:{PORT}"

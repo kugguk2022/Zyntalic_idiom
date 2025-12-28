@@ -39,6 +39,18 @@ USE_CACHE = os.getenv("ZYNTALIC_DISABLE_CACHE", "").lower() not in {"1", "true",
 
 app = FastAPI(title="Zyntalic API", version="0.3.0")
 
+try:
+    from fastapi.middleware.cors import CORSMiddleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+except ImportError:
+    print("WARNING: CORSMiddleware could not be imported. Ensure fastapi is installed.")
+
 
 @app.on_event("startup")
 async def startup_event():
