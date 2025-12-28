@@ -35,17 +35,17 @@
 lsof -ti :8001 | xargs kill -9
 
 # 2. Start server
-python3 -m run_desktop
+python3 -m scripts.run_desktop
 ```
 
 ### For Windows:
 
 ```powershell
 # Use the batch file
-start_server.bat
+scripts\start_server.bat
 
 # OR manually:
-python -m run_desktop
+python -m scripts.run_desktop
 ```
 
 ## 🎯 What You'll See Now
@@ -68,18 +68,18 @@ python -m run_desktop
 
 Run this to check everything:
 ```bash
-python check_status.py
+python scripts/check_status.py
 ```
 
 Run this to test output format:
 ```bash
-python test_output_format.py
+pytest -q tests/test_output_format.py
 ```
 
 ## 🐛 Troubleshooting
 
 **"Failed to connect to Zyntalic Local Engine"**
-- Server not running → Run `python -m run_desktop`
+- Server not running → Run `python -m scripts.run_desktop`
 - Port conflict → Kill process on 8001 first
 
 **"Address already in use"**

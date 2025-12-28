@@ -98,6 +98,41 @@ const App: React.FC = () => {
     }
   };
 
+  const downloadText = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportVisible = () => {
+    if (!outputResult) return;
+    downloadText(outputResult.text, 'zyntalic_export.txt');
+  };
+
+  const exportZyntalicOnly = () => {
+    if (!outputResult) return;
+    const blocks = outputResult.text.split(/\n\s*\n/);
+    const zOnly = blocks
+      .map((block) => {
+        const lines = block.split(/\n/);
+        const arrow = lines.find((l) => l.trim().startsWith('→'));
+        if (arrow) {
+          return arrow.replace(/^.*→\s?/, '').trim();
+        }
+        // Fallback: if no arrow, return last line
+        return lines[lines.length - 1]?.trim() || '';
+      })
+      .filter(Boolean)
+      .join('\n');
+    downloadText(zOnly, 'zyntalic_only.txt');
+  };
+
   return (
     <div className="min-h-screen flex flex-col text-slate-200 selection:bg-indigo-500/30">
       {/* Header */}
@@ -195,16 +230,34 @@ const App: React.FC = () => {
             <div className="flex flex-col bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:border-indigo-500/30 hover:shadow-indigo-500/5 group relative">
               <div className="bg-slate-800/30 px-6 py-4 flex justify-between items-center group-hover:bg-slate-800/50 transition-colors">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Target Surface</span>
-                <button 
-                  onClick={copyToClipboard}
-                  disabled={!outputResult}
-                  className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 disabled:opacity-30 active:scale-90"
-                  title="Copy Results"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-3 8h3m-3 4h3m-6-4h.01M9 16h.01" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={copyToClipboard}
+                    disabled={!outputResult}
+                    className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 disabled:opacity-30 active:scale-90"
+                    title="Copy Results"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-3 8h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={exportVisible}
+                    disabled={!outputResult}
+                    className="px-3 py-1 text-xs font-semibold rounded-md border border-slate-700 text-slate-300 hover:border-indigo-500 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all duration-200 disabled:opacity-30"
+                    title="Export exactly what is shown"
+                  >
+                    Export shown
+                  </button>
+                  <button
+                    onClick={exportZyntalicOnly}
+                    disabled={!outputResult}
+                    className="px-3 py-1 text-xs font-semibold rounded-md border border-slate-700 text-slate-300 hover:border-emerald-500 hover:text-emerald-200 hover:bg-emerald-500/10 transition-all duration-200 disabled:opacity-30"
+                    title="Export Zyntalic text only"
+                  >
+                    Export Zyntalic
+                  </button>
+                </div>
               </div>
               <div className="flex-1 p-6 text-lg leading-relaxed mono whitespace-pre-wrap overflow-y-auto">
                 {isProcessing ? (

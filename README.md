@@ -21,7 +21,12 @@ Optional:
 - Better embeddings: `pip install -e ".[embeddings]"`
 - Desktop/web app: `pip install -e ".[web,pdf,desktop]"`
 
-# running test suite
+# Running tests
+```bash
+pytest -q
+```
+
+Demo only (does not replace pytest):
 ```bash
 python3 -c "from zyntalic.test_suite import demo_test_suite; demo_test_suite()"
 ```
@@ -51,9 +56,9 @@ uvicorn apps.web.app:app --reload --port 8000
 
 ## Desktop/Web launcher
 
-- Windows (cmd/PowerShell): `start_server.bat`
-- Bash/WSL: `chmod +x start_server.sh && ./start_server.sh`
-- Direct Python (any shell): `python -m run_desktop`
+- Windows (cmd/PowerShell): `scripts\start_server.bat`
+- Bash/WSL: `chmod +x scripts/start_server.sh && scripts/start_server.sh`
+- Direct Python (any shell): `python -m scripts.run_desktop`
 
 The launchers check port 8001 before starting and then open the bundled UI.
 
@@ -72,8 +77,9 @@ Zyntalic/
   apps/        # CLI + web API wrappers
   zyntalic/    # core library (deterministic)
   evals/       # tests / regression checks
+  tests/       # user-facing tests
   data/        # small fixtures only
-  scripts/     # utilities
+  scripts/     # operational utilities and launchers
 ```
 
 ## Notes
