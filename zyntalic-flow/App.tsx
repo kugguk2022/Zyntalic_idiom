@@ -26,8 +26,8 @@ const App: React.FC = () => {
     try {
       const result = await performTranslation(inputText, config);
       setOutputResult(result);
-      // Auto-export the result
-      downloadText(result.text, 'zyntalic_export.txt');
+      // Auto-export removed: It triggers browser popup blockers.
+      // User must click the manual "Download" button.
     } catch (err: any) {
       setError(err.message || 'Transmission error detected.');
     } finally {
@@ -311,23 +311,33 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <button 
-              onClick={handleTranslate}
-              disabled={isProcessing || !inputText.trim()}
-              className="group relative inline-flex items-center gap-3 px-10 py-5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:opacity-50 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 transition-all duration-300 active:scale-[0.98] hover:-translate-y-1 overflow-hidden"
-            >
-              <span className="relative z-10">{isProcessing ? 'Processing...' : 'Initialize Flow'}</span>
-              <svg 
-                className={`w-5 h-5 relative z-10 transition-transform duration-300 ${isProcessing ? 'animate-spin' : 'group-hover:translate-x-1'}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
+            <div className="flex gap-4">
+              <button
+                onClick={exportVisible}
+                disabled={!outputResult}
+                className="px-6 py-5 rounded-2xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700 hover:border-indigo-500/50"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-              <div className="absolute inset-0 bg-gradient-to-r from-indigo-400/0 via-white/10 to-indigo-400/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
-              <div className="absolute -inset-1 bg-indigo-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            </button>
+                Download Result
+              </button>
+
+              <button 
+                onClick={handleTranslate}
+                disabled={isProcessing || !inputText.trim()}
+                className="group relative inline-flex items-center gap-3 px-10 py-5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:opacity-50 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 transition-all duration-300 active:scale-[0.98] hover:-translate-y-1 overflow-hidden"
+              >
+                <span className="relative z-10">{isProcessing ? 'Processing...' : 'Initialize Flow'}</span>
+                <svg 
+                  className={`w-5 h-5 relative z-10 transition-transform duration-300 ${isProcessing ? 'animate-spin' : 'group-hover:translate-x-1'}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-400/0 via-white/10 to-indigo-400/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                <div className="absolute -inset-1 bg-indigo-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              </button>
+            </div>
           </div>
         </div>
       </main>
