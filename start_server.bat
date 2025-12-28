@@ -3,6 +3,8 @@ echo ============================================================
 echo Zyntalic Server Startup
 echo ============================================================
 echo.
+echo (Use this script in cmd/PowerShell. For bash/WSL, run start_server.sh)
+echo.
 echo Checking for existing processes on port 8001...
 
 :: Kill any process using port 8001

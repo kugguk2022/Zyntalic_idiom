@@ -19,6 +19,7 @@ pip install -e ".[dev]"
 Optional:
 - Web API: `pip install -e ".[web]"`
 - Better embeddings: `pip install -e ".[embeddings]"`
+- Desktop/web app: `pip install -e ".[web,pdf,desktop]"`
 
 # running test suite
 ```bash
@@ -47,6 +48,14 @@ uvicorn apps.web.app:app --reload --port 8000
 
 - `GET /health`
 - `POST /translate`
+
+## Desktop/Web launcher
+
+- Windows (cmd/PowerShell): `start_server.bat`
+- Bash/WSL: `chmod +x start_server.sh && ./start_server.sh`
+- Direct Python (any shell): `python -m run_desktop`
+
+The launchers check port 8001 before starting and then open the bundled UI.
 
 ## Projection training (optional)
 

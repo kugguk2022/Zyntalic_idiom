@@ -13,14 +13,22 @@ from __future__ import annotations
 
 from typing import List, Optional
 import hashlib
+import os
 import random
 
 _MODEL = None
 _DIM: Optional[int] = None
 
+# When set, skip loading sentence-transformers and use fast hash-based embeddings only.
+_HASH_ONLY = os.getenv("ZYNTALIC_FAST", "").lower() in ("1", "true", "yes", "on") or os.getenv("ZYNTALIC_HASH_ONLY", "").lower() in ("1", "true", "yes", "on")
+
 def _lazy_load_model() -> None:
     global _MODEL, _DIM
     if _MODEL is not None:
+        return
+    if _HASH_ONLY:
+        _MODEL = None
+        _DIM = None
         return
     try:
         from sentence_transformers import SentenceTransformer  # type: ignore
@@ -38,6 +46,9 @@ def embed_text(text: str, dim: int = 300) -> List[float]:
     If a sentence-transformers model is available, we take its embedding and
     deterministically trim/pad to `dim`. Otherwise we generate a stable
     pseudo-embedding using a hash-seeded RNG.
+
+    Set ZYNTALIC_FAST=1 (or ZYNTALIC_HASH_ONLY=1) to force the fast hash-only
+    path, avoiding model load for lower latency on long texts.
     """
     _lazy_load_model()
 

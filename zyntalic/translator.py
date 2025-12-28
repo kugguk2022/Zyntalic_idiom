@@ -18,6 +18,18 @@ from . import core
 
 # Memoize projection to avoid repeated disk reads during translation hot path
 _PROJECTION_W = core.get_projection()
+_WARMED = False
+
+
+def _ensure_warm() -> None:
+    """Warm caches once per process to avoid first-call latency on long texts."""
+    global _WARMED
+    if _WARMED:
+        return
+    try:
+        warm_translation_pipeline()
+    finally:
+        _WARMED = True
 
 
 def warm_translation_pipeline() -> None:
@@ -135,6 +147,7 @@ def translate_text(
     """
     Translate multi-sentence text into a list of records.
     """
+    _ensure_warm()
     text = (text or "").strip()
     if not text:
         return []
