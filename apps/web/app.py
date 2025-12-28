@@ -35,7 +35,8 @@ from zyntalic.utils.cache import (
 )
 
 # Disable cache via env if needed for batch/PDF flows where users expect fresh outputs
-USE_CACHE = os.getenv("ZYNTALIC_DISABLE_CACHE", "").lower() not in {"1", "true", "yes"}
+# Disable cache via env if needed for batch/PDF flows where users expect fresh outputs
+USE_CACHE = False
 
 app = FastAPI(title="Zyntalic API", version="0.3.0")
 
