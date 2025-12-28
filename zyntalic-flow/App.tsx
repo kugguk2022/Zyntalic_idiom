@@ -11,6 +11,10 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Central flag so every export/download button unlocks as soon as any result object exists
+  // (avoid over-strict trimming that could keep buttons disabled)
+  const hasOutput = !!outputResult && outputResult.text !== undefined;
+
   const [config, setConfig] = useState<TranslationConfig>({
     engine: TranslationEngine.SEMANTIC,
     mirror: 0.3,  // Lower value shows more Zyntalic vocabulary
@@ -95,7 +99,7 @@ const App: React.FC = () => {
   };
 
   const copyToClipboard = () => {
-    if (outputResult) {
+    if (hasOutput && outputResult) {
       navigator.clipboard.writeText(outputResult.text);
     }
   };
@@ -113,12 +117,12 @@ const App: React.FC = () => {
   };
 
   const exportVisible = () => {
-    if (!outputResult) return;
+    if (!hasOutput || !outputResult) return;
     downloadText(outputResult.text, 'zyntalic_export.txt');
   };
 
   const exportZyntalicOnly = () => {
-    if (!outputResult) return;
+    if (!hasOutput || !outputResult) return;
     const blocks = outputResult.text.split(/\n\s*\n/);
     const zOnly = blocks
       .map((block) => {
@@ -235,7 +239,7 @@ const App: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={copyToClipboard}
-                    disabled={!outputResult}
+                    disabled={!hasOutput}
                     className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 disabled:opacity-30 active:scale-90"
                     title="Copy Results"
                   >
@@ -245,7 +249,7 @@ const App: React.FC = () => {
                   </button>
                   <button
                     onClick={exportVisible}
-                    disabled={!outputResult}
+                    disabled={!hasOutput}
                     className="px-3 py-1 text-xs font-semibold rounded-md border border-slate-700 text-slate-300 hover:border-indigo-500 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all duration-200 disabled:opacity-30"
                     title="Export exactly what is shown"
                   >
@@ -253,7 +257,7 @@ const App: React.FC = () => {
                   </button>
                   <button
                     onClick={exportZyntalicOnly}
-                    disabled={!outputResult}
+                    disabled={!hasOutput}
                     className="px-3 py-1 text-xs font-semibold rounded-md border border-slate-700 text-slate-300 hover:border-emerald-500 hover:text-emerald-200 hover:bg-emerald-500/10 transition-all duration-200 disabled:opacity-30"
                     title="Export Zyntalic text only"
                   >
@@ -314,7 +318,7 @@ const App: React.FC = () => {
             <div className="flex gap-4">
               <button
                 onClick={exportVisible}
-                disabled={!outputResult}
+                disabled={!hasOutput}
                 className="px-6 py-5 rounded-2xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700 hover:border-indigo-500/50"
               >
                 Download Result
