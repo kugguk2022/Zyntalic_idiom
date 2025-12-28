@@ -34,6 +34,9 @@ from zyntalic.utils.cache import (
     init_cache,
 )
 
+# Disable cache via env if needed for batch/PDF flows where users expect fresh outputs
+USE_CACHE = os.getenv("ZYNTALIC_DISABLE_CACHE", "").lower() not in {"1", "true", "yes"}
+
 app = FastAPI(title="Zyntalic API", version="0.3.0")
 
 
@@ -287,13 +290,14 @@ def translate(req: TranslateRequest):
     try:
         print(f"[TRANSLATE] Request received: text='{req.text[:50]}...', engine={req.engine}, mirror_rate={req.mirror_rate}")
         
-        # First try cache to avoid re-generation
-        cached = get_cached_translation(req.text, req.engine, req.mirror_rate)
+        cached = None
+        if USE_CACHE:
+            cached = get_cached_translation(req.text, req.engine, req.mirror_rate)
         if cached:
             print(f"[TRANSLATE] Cache hit, returning cached result")
             return {"rows": [cached], "cached": True}
 
-        print(f"[TRANSLATE] Cache miss, generating new translation...")
+        print(f"[TRANSLATE] Generating new translation... (cache {'enabled' if USE_CACHE else 'disabled'})")
         rows = translate_text(req.text, mirror_rate=req.mirror_rate, engine=req.engine)
         print(f"[TRANSLATE] Generated {len(rows)} translation rows")
 
@@ -308,7 +312,7 @@ def translate(req: TranslateRequest):
                     mirror_rate=req.mirror_rate,
                     anchors=row.get("anchors", []),
                     embedding=row.get("embedding") if isinstance(row, dict) else None,
-                )
+                ) if USE_CACHE else row
             )
 
         print(f"[TRANSLATE] Success: returning {len(stored_rows)} rows")
