@@ -1,5 +1,9 @@
 # Zyntalic
 
+<p align="center">
+  <img src="zyntalic-flow/public/favicon.svg" alt="Zyntalic logo" width="96">
+</p>
+
 A deterministic **synthetic-language toolkit** (conlang engine) that maps input text to a stable “Zyntalic” surface form using:
 
 - deterministic word generation (seeded by text)
