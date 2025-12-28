@@ -352,16 +352,10 @@ def create_latin_syllable(rng) -> str:
 
 def create_syllable(rng, pos: str = "noun") -> str:
     """
-    Surface syllables obey the 85/15 split:
-    - nouns skew Hangul
-    - verbs skew Polish/Latin
+    Surface syllables are strictly Polish/Latin based.
+    Hangul is reserved for the context tail.
     """
-    r = rng.random()
-    if pos == "noun":
-        return create_hangul_syllable(rng) if r < 0.85 else create_latin_syllable(rng)
-    if pos == "verb":
-        return create_latin_syllable(rng) if r < 0.85 else create_hangul_syllable(rng)
-    return create_hangul_syllable(rng) if r < 0.5 else create_latin_syllable(rng)
+    return create_latin_syllable(rng)
 
 
 def generate_word(seed_key: str) -> str:
