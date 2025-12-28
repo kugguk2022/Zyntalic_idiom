@@ -26,6 +26,8 @@ const App: React.FC = () => {
     try {
       const result = await performTranslation(inputText, config);
       setOutputResult(result);
+      // Auto-export the result
+      downloadText(result.text, 'zyntalic_export.txt');
     } catch (err: any) {
       setError(err.message || 'Transmission error detected.');
     } finally {
