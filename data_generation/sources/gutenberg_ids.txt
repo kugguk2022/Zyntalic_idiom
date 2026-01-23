@@ -1,0 +1,5 @@
+# One Project Gutenberg ID per line.
+# Example IDs (public domain): 84 (Frankenstein), 1342 (Pride and Prejudice), 1661 (Sherlock Holmes)
+84
+1342
+1661

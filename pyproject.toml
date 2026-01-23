@@ -25,6 +25,7 @@ embeddings = ["sentence-transformers>=2.6.0"]
 pdf = ["PyPDF2>=3.0.0"]
 desktop = ["pywebview>=4.4.1"]
 gemini = ["google-generativeai>=0.8.3"]
+data = ["requests>=2.31.0", "beautifulsoup4>=4.12.0", "tqdm>=4.66.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]

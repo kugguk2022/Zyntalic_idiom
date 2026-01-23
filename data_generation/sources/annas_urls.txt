@@ -1,0 +1,2 @@
+# One URL per line. Provide direct download URLs or page URLs when using --scrape.
+# Example (placeholder): https://example.com/path/to/book.txt
