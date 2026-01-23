@@ -20,6 +20,7 @@ from enum import Enum
 
 from .morphology import Case, Number, Tense, Aspect, Evidentiality, MorphologicalProcessor
 from .utils.rng import get_rng
+from . import nlp
 
 # -------------------- Syntactic Categories --------------------
 
@@ -253,9 +254,20 @@ class ZyntalicSyntaxProcessor:
     
     def _tokenize_advanced(self, text: str) -> List[Dict[str, str]]:
         """Advanced tokenization with POS tagging."""
-        # Simple tokenization - real implementation would use proper POS tagger
+        if nlp.backend_name() == "spacy":
+            tokens = []
+            for tok in nlp.analyze_tokens(text):
+                tokens.append({
+                    'word': tok.get('text', ''),
+                    'pos': tok.get('pos', 'X'),
+                    'lemma': (tok.get('lemma') or tok.get('text', '')).lower(),
+                    'features': {}
+                })
+            return tokens
+
+        # Simple tokenization - fallback when NLP isn't available
         raw_tokens = re.findall(r"\w+(?:'\w+)?|[^\w\s]", text.lower())
-        
+
         tokens = []
         for token in raw_tokens:
             pos = self._guess_pos(token)
@@ -265,7 +277,7 @@ class ZyntalicSyntaxProcessor:
                 'lemma': self._lemmatize(token),
                 'features': {}
             })
-        
+
         return tokens
     
     def _guess_pos(self, word: str) -> str:

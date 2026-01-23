@@ -6,6 +6,9 @@ Outputs: models/W.npy, models/meta.json
 import argparse, os, json, random, numpy as np
 from collections import defaultdict
 import hashlib
+from zyntalic.logging_utils import get_logger
+
+logger = get_logger("zyntalic.train_projection")
 
 ANCHORS = [
     "Homer_Iliad", "Homer_Odyssey", "Plato_Republic",
@@ -185,7 +188,7 @@ def main():
     with open(os.path.join(args.out_dir, "meta.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
-    print(f"Saved {args.out_dir}/W.npy; top-1={acc:.3f} (n={total})")
+    logger.info("Saved %s/W.npy; top-1=%.3f (n=%s)", args.out_dir, acc, total)
 
 if __name__ == "__main__":
     main()

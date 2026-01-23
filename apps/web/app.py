@@ -25,6 +25,7 @@ except ImportError:
 genai = None
 
 from zyntalic.translator import translate_text, warm_translation_pipeline
+from zyntalic.logging_utils import get_logger
 from zyntalic.utils.cache import (
     get_cached_translation,
     put_cached_translation,
@@ -36,6 +37,9 @@ from zyntalic.utils.cache import (
 USE_CACHE = False
 
 app = FastAPI(title="Zyntalic API", version="0.3.0")
+logger = get_logger("zyntalic.web")
+MAX_TEXT_CHARS = int(os.getenv("ZYNTALIC_MAX_TEXT_CHARS", "20000"))
+ALLOWED_ENGINES = {"core", "transformer", "chiasmus", "test_suite"}
 
 try:
     from fastapi.middleware.cors import CORSMiddleware
@@ -47,7 +51,7 @@ try:
         allow_headers=["*"],
     )
 except ImportError:
-    print("WARNING: CORSMiddleware could not be imported. Ensure fastapi is installed.")
+    logger.warning("CORSMiddleware could not be imported. Ensure fastapi is installed.")
 
 
 @app.on_event("startup")
@@ -57,7 +61,7 @@ async def startup_event():
     try:
         warm_translation_pipeline()
     except Exception as exc:
-        print(f"[startup] Translation warmup skipped: {exc}")
+        logger.warning("Translation warmup skipped: %s", exc)
 
 # Mount static directory
 # We now point to the built React app in zyntalic-flow/dist
@@ -68,14 +72,14 @@ public_dir = repo_root / "zyntalic-flow" / "public"
 
 if not static_dir.exists():
     # Fallback to old static if build fails or during dev
-    print(f"WARNING: React build not found at {static_dir}. Falling back to legacy static.")
+    logger.warning("React build not found at %s. Falling back to legacy static.", static_dir)
     static_dir = Path(__file__).resolve().parent / "static"
 
 assets_dir = static_dir / "assets"
 if assets_dir.exists():
     app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 else:
-    print(f"WARNING: Assets directory not found at {assets_dir}. Static assets will 404 until the frontend is built.")
+    logger.warning("Assets directory not found at %s. Static assets will 404 until the frontend is built.", assets_dir)
 
 
 def _find_frontend_file(filename: str) -> Path | None:
@@ -259,7 +263,7 @@ if MULTIPART_INSTALLED:
                         raw_text += page_text + "\n"
                 except Exception as e:
                     # Skip problematic pages but continue
-                    print(f"Warning: Could not extract text from page {page_num + 1}: {e}")
+                    logger.warning("Could not extract text from page %s: %s", page_num + 1, e)
                     continue
 
             # Clean the extracted text
@@ -298,24 +302,34 @@ def health():
 @app.post("/translate")
 def translate(req: TranslateRequest):
     try:
-        print(f"[TRANSLATE] Request received: text='{req.text[:50]}...', engine={req.engine}, mirror_rate={req.mirror_rate}")
+        text = (req.text or "").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Text is required.")
+        if len(text) > MAX_TEXT_CHARS:
+            raise HTTPException(status_code=413, detail=f"Text too large (>{MAX_TEXT_CHARS} chars).")
+        if not (0.0 <= req.mirror_rate <= 1.0):
+            raise HTTPException(status_code=422, detail="mirror_rate must be between 0.0 and 1.0.")
+        if req.engine not in ALLOWED_ENGINES:
+            raise HTTPException(status_code=422, detail=f"Unsupported engine: {req.engine}")
+
+        logger.info("Translate request: len=%s engine=%s mirror_rate=%.2f", len(text), req.engine, req.mirror_rate)
         
         cached = None
         if USE_CACHE:
-            cached = get_cached_translation(req.text, req.engine, req.mirror_rate)
+            cached = get_cached_translation(text, req.engine, req.mirror_rate)
         if cached:
-            print(f"[TRANSLATE] Cache hit, returning cached result")
+            logger.info("Translate cache hit")
             return {"rows": [cached], "cached": True}
 
-        print(f"[TRANSLATE] Generating new translation... (cache {'enabled' if USE_CACHE else 'disabled'})")
-        rows = translate_text(req.text, mirror_rate=req.mirror_rate, engine=req.engine)
+        logger.info("Generating translation (cache %s)", "enabled" if USE_CACHE else "disabled")
+        rows = translate_text(text, mirror_rate=req.mirror_rate, engine=req.engine)
         if req.zyntalic_only:
             rows = [{"target": row.get("target", "")} for row in rows]
-        print(f"[TRANSLATE] Generated {len(rows)} translation rows")
+        logger.info("Generated %s translation rows", len(rows))
 
         stored_rows = []
         for i, row in enumerate(rows):
-            print(f"[TRANSLATE] Row {i}: source='{row.get('source', 'N/A')[:30]}...', target='{row.get('target', 'N/A')[:30]}...'")
+            logger.debug("Row %s: source='%s' target='%s'", i, row.get("source", "N/A")[:30], row.get("target", "N/A")[:30])
             stored_rows.append(
                 put_cached_translation(
                     source=row.get("source", req.text),
@@ -327,11 +341,9 @@ def translate(req: TranslateRequest):
                 ) if USE_CACHE else row
             )
 
-        print(f"[TRANSLATE] Success: returning {len(stored_rows)} rows")
+        logger.info("Translate success: returning %s rows", len(stored_rows))
         return {"rows": stored_rows, "cached": False}
         
     except Exception as exc:
-        print(f"[TRANSLATE] ERROR: {type(exc).__name__}: {exc}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Translation failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Translation failed: {exc}") from exc

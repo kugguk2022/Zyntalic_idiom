@@ -10,11 +10,11 @@ This wraps the deterministic core into a stable interface usable by:
 
 from __future__ import annotations
 
-from dataclasses import asdict
 import re
 from typing import Dict, List, Optional
 
 from . import core
+from . import nlp
 
 # Memoize projection to avoid repeated disk reads during translation hot path
 _PROJECTION_W = core.get_projection()
@@ -47,15 +47,17 @@ def warm_translation_pipeline() -> None:
     except Exception as exc:  # pragma: no cover - defensive guard
         print(f"[warmup] Warning: preload skipped due to: {exc}")
 
-_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
-
 def _clean_lemma(text: str) -> str:
-    t = re.sub(r"[^A-Za-z0-9'\- ]+", " ", (text or "").strip().lower())
-    t = re.sub(r"\s+", " ", t).strip()
+    # Prefer NLP backend lemma if available; fallback to regex normalization.
+    t = (text or "").strip()
     if not t:
         return ""
-    # first word as lemma seed (stable; avoids sentence-level randomness explosion)
-    return t.split()[0]
+    lemma = nlp.first_lemma(t)
+    if lemma:
+        return lemma.lower()
+    t = re.sub(r"[^A-Za-z0-9'\- ]+", " ", t.lower())
+    t = re.sub(r"\s+", " ", t).strip()
+    return t.split()[0] if t else ""
 
 
 def translate_sentence(
@@ -151,5 +153,28 @@ def translate_text(
     text = (text or "").strip()
     if not text:
         return []
-    parts = _SENT_SPLIT.split(text)
+    parts = nlp.split_sentences(text)
     return [translate_sentence(p, mirror_rate=mirror_rate, engine=engine, W=W) for p in parts if p.strip()]
+
+
+def translate_batch(
+    texts: List[str],
+    *,
+    mirror_rate: float = 0.8,
+    engine: str = "core",
+    W=None,
+    flatten: bool = False,
+) -> List:
+    """Translate a batch of texts efficiently.
+
+    If flatten=True, returns a single flat list of rows; otherwise a list of lists.
+    """
+    _ensure_warm()
+    results: List[List[Dict]] = []
+    for text in texts:
+        rows = translate_text(text, mirror_rate=mirror_rate, engine=engine, W=W)
+        results.append(rows)
+
+    if flatten:
+        return [row for group in results for row in group]
+    return results

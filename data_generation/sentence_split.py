@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 from typing import Iterable
 
+from zyntalic import nlp
+
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
 _WORD = re.compile(r"[A-Za-z][A-Za-z'\-]+")
 
@@ -47,7 +49,8 @@ def main() -> int:
         for path in iter_files(in_dir):
             text = path.read_text(encoding="utf-8", errors="ignore")
             text = text.replace("\n", " ")
-            for sentence in _SENT_SPLIT.split(text):
+            sentences = nlp.split_sentences(text) or _SENT_SPLIT.split(text)
+            for sentence in sentences:
                 sentence = sentence.strip()
                 if not sentence:
                     continue

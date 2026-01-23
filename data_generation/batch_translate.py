@@ -34,10 +34,8 @@ def iter_jsonl(path: Path) -> Iterable[Dict]:
 def translate_api(sentences: List[str], mirror_rate: float, engine: str) -> List[Dict]:
     from zyntalic import translator
     translator.warm_translation_pipeline()
-    return [
-        translator.translate_sentence(s, mirror_rate=mirror_rate, engine=engine)
-        for s in sentences
-    ]
+    rows = translator.translate_batch(sentences, mirror_rate=mirror_rate, engine=engine, flatten=True)
+    return rows
 
 
 def translate_server(sentences: List[str], mirror_rate: float, engine: str, url: str) -> List[Dict]:
@@ -65,6 +63,7 @@ def main() -> int:
     p.add_argument("--mirror-rate", type=float, default=0.3)
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--sleep", type=float, default=0.0)
+    p.add_argument("--batch-size", type=int, default=32)
     args = p.parse_args()
 
     in_path = Path(args.input)
@@ -72,27 +71,47 @@ def main() -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     count = 0
+    buffer = []
+    meta = []
     with out_path.open("w", encoding="utf-8") as f:
         for rec in iter_jsonl(in_path):
             sentence = rec.get("sentence", "").strip()
             if not sentence:
                 continue
+            buffer.append(sentence)
+            meta.append((rec.get("source_id"), rec.get("source_path")))
+
+            if len(buffer) >= args.batch_size:
+                rows = (
+                    translate_api(buffer, args.mirror_rate, args.engine)
+                    if args.mode == "api"
+                    else translate_server(buffer, args.mirror_rate, args.engine, args.server_url)
+                )
+                for row, (source_id, source_path) in zip(rows, meta):
+                    row["source_id"] = source_id
+                    row["source_path"] = source_path
+                    f.write(json.dumps(row, ensure_ascii=False) + "\n")
+                    count += 1
+                    if args.limit and count >= args.limit:
+                        return 0
+                buffer = []
+                meta = []
+                if args.sleep:
+                    time.sleep(args.sleep)
+
+        if buffer:
             rows = (
-                translate_api([sentence], args.mirror_rate, args.engine)
+                translate_api(buffer, args.mirror_rate, args.engine)
                 if args.mode == "api"
-                else translate_server([sentence], args.mirror_rate, args.engine, args.server_url)
+                else translate_server(buffer, args.mirror_rate, args.engine, args.server_url)
             )
-            if not rows:
-                continue
-            row = rows[0]
-            row["source_id"] = rec.get("source_id")
-            row["source_path"] = rec.get("source_path")
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-            count += 1
-            if args.limit and count >= args.limit:
-                break
-            if args.sleep:
-                time.sleep(args.sleep)
+            for row, (source_id, source_path) in zip(rows, meta):
+                row["source_id"] = source_id
+                row["source_path"] = source_path
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+                count += 1
+                if args.limit and count >= args.limit:
+                    break
 
     return 0
 

@@ -59,6 +59,7 @@ def main() -> int:
     p.add_argument("--mirror-rate", type=float, default=0.3)
     p.add_argument("--min-count", type=int, default=1)
     p.add_argument("--limit", type=int, default=0)
+    p.add_argument("--batch-size", type=int, default=128)
     args = p.parse_args()
 
     counter: Counter[str] = Counter()
@@ -77,18 +78,26 @@ def main() -> int:
     out_tsv = Path(args.output_tsv)
 
     dictionary = {}
-    for word in items:
-        row = (
-            translate_word_api(word, args.mirror_rate, args.engine)
-            if args.mode == "api"
-            else translate_word_server(word, args.mirror_rate, args.engine, args.server_url)
-        )
-        if not row:
-            continue
-        dictionary[word] = {
-            "zyntalic": row.get("target", ""),
-            "count": counter[word],
-        }
+    if args.mode == "api":
+        from zyntalic import translator
+        translator.warm_translation_pipeline()
+        for i in range(0, len(items), args.batch_size):
+            chunk = items[i : i + args.batch_size]
+            rows = translator.translate_batch(chunk, mirror_rate=args.mirror_rate, engine=args.engine, flatten=True)
+            for word, row in zip(chunk, rows):
+                dictionary[word] = {
+                    "zyntalic": row.get("target", ""),
+                    "count": counter[word],
+                }
+    else:
+        for word in items:
+            row = translate_word_server(word, args.mirror_rate, args.engine, args.server_url)
+            if not row:
+                continue
+            dictionary[word] = {
+                "zyntalic": row.get("target", ""),
+                "count": counter[word],
+            }
 
     out_path.write_text(json.dumps(dictionary, ensure_ascii=False, indent=2), encoding="utf-8")
 

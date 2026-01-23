@@ -8,13 +8,15 @@ Goal: be deterministic and dependency-light.
 - Tense: present (default), past, future
 
 This is not a full NLP parser. It's a stable heuristic that makes "good enough"
-S-O-V-C rearrangements without pulling in spaCy/NLTK.
+S-O-V-C rearrangements, with an optional spaCy-backed tokenizer if available.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional, Sequence
+
+from . import nlp
 
 # A tiny vowel-harmony proxy to get a Hungarian-ish feeling.
 BACK_VOWELS = "aáoóuú"
@@ -55,8 +57,14 @@ class ParsedSentence:
     obj_plural: bool = False
 
 
-def _tokenize(text: str) -> list[str]:
-    # keep apostrophes inside words
+def _tokenize(text: str, use_nlp: Optional[bool] = None) -> list[str]:
+    # Keep apostrophes inside words; optionally use NLP backend.
+    if use_nlp is None:
+        use_nlp = nlp.backend_name() == "spacy"
+    if use_nlp:
+        tokens = [t["text"] for t in nlp.analyze_tokens(text)]
+        return [t for t in tokens if t]
+
     out = []
     buff = []
     for ch in text.strip():
@@ -109,8 +117,8 @@ def _find_verb(tokens: Sequence[str]) -> int:
     return max(0, min(len(tokens)-1, len(tokens)//2))
 
 
-def parse_english(text: str) -> ParsedSentence:
-    tokens = _tokenize(text)
+def parse_english(text: str, *, use_nlp: Optional[bool] = None) -> ParsedSentence:
+    tokens = _tokenize(text, use_nlp=use_nlp)
     if not tokens:
         return ParsedSentence(subject="", verb="", obj="", context="")
 
