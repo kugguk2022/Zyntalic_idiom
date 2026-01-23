@@ -19,7 +19,7 @@ const App: React.FC = () => {
     engine: TranslationEngine.SEMANTIC,
     mirror: 0.3,  // Lower value shows more Zyntalic vocabulary
     sourceLang: 'Auto-detect',
-    targetLang: 'English'
+    targetLang: 'Zyntalic'
   });
 
   const handleTranslate = async () => {

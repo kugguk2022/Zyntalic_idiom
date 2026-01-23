@@ -13,11 +13,6 @@ const SOURCE_LANGUAGES = [
   'Arabic', 'Hindi', 'Dutch', 'Turkish'
 ];
 
-const TARGET_LANGUAGES = [
-  'Zyntalic',
-  ...SOURCE_LANGUAGES,
-];
-
 const SettingsBar: React.FC<SettingsBarProps> = ({ config, onChange }) => {
   return (
     <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-8 backdrop-blur-sm">
@@ -72,15 +67,9 @@ const SettingsBar: React.FC<SettingsBarProps> = ({ config, onChange }) => {
           </div>
           <div className="space-y-1">
             <span className="text-[10px] text-slate-500 uppercase ml-1">Target</span>
-            <select 
-              value={config.targetLang}
-              onChange={(e) => onChange({ targetLang: e.target.value })}
-              className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 appearance-none cursor-pointer"
-            >
-              {TARGET_LANGUAGES.map(lang => (
-                <option key={`tgt-${lang}`} value={lang}>{lang}</option>
-              ))}
-            </select>
+            <div className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm">
+              Zyntalic
+            </div>
           </div>
         </div>
       </div>

@@ -91,6 +91,7 @@ class TranslateRequest(BaseModel):
     text: str
     mirror_rate: float = 0.3  # Lower value = more Zyntalic vocabulary, higher = more English templates
     engine: str = "core"  # "core"|"chiasmus"|"transformer"|"test_suite"
+    zyntalic_only: bool = False
 
 
 @app.get("/")
@@ -308,6 +309,8 @@ def translate(req: TranslateRequest):
 
         print(f"[TRANSLATE] Generating new translation... (cache {'enabled' if USE_CACHE else 'disabled'})")
         rows = translate_text(req.text, mirror_rate=req.mirror_rate, engine=req.engine)
+        if req.zyntalic_only:
+            rows = [{"target": row.get("target", "")} for row in rows]
         print(f"[TRANSLATE] Generated {len(rows)} translation rows")
 
         stored_rows = []
@@ -332,4 +335,3 @@ def translate(req: TranslateRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Translation failed: {exc}") from exc
-

@@ -179,7 +179,8 @@
           body: JSON.stringify({
             text,
             mirror_rate: parseFloat(mirror.value),
-            engine: engine.value
+            engine: engine.value,
+            zyntalic_only: true
           })
         });
         const data = await resp.json();

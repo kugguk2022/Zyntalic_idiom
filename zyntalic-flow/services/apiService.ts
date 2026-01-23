@@ -32,6 +32,7 @@ export const performTranslation = async (
             text: text,
             mirror_rate: config.mirror,
             engine: engine,
+            zyntalic_only: true,
         }),
     });
 
@@ -43,19 +44,13 @@ export const performTranslation = async (
     const endTime = Date.now();
     
     // Backend returns { rows: [{ source, target, lemma, anchors, engine }] }
-    // We need to map this to TranslationResult
-    // Format to show both source and target for clarity
-    
-    // If rows is missing or empty, handle gracefully
+    // We only display the Zyntalic output in the target pane.
+    // If rows is missing or empty, handle gracefully.
     const rows = data.rows || [];
     
-    // Format each translation to show: [English] → Zyntalic
-    const translatedText = rows.map((r: any) => {
-      const source = r.source || "Unknown";
-      const target = r.target || "???";
-      // Show the original sentence followed by its translation
-      return `[${source}]\n→ ${target}`;
-    }).join("\n\n");
+    const translatedText = rows
+      .map((r: any) => r.target || "???")
+      .join("\n\n");
 
     return {
       text: translatedText || "No translation generated.",
