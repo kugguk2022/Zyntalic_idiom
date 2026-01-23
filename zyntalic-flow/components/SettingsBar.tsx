@@ -7,10 +7,15 @@ interface SettingsBarProps {
   onChange: (updates: Partial<TranslationConfig>) => void;
 }
 
-const LANGUAGES = [
-  'English', 'Spanish', 'French', 'German', 'Chinese', 
+const SOURCE_LANGUAGES = [
+  'English', 'Spanish', 'French', 'German', 'Chinese',
   'Japanese', 'Korean', 'Russian', 'Portuguese', 'Italian',
   'Arabic', 'Hindi', 'Dutch', 'Turkish'
+];
+
+const TARGET_LANGUAGES = [
+  'Zyntalic',
+  ...SOURCE_LANGUAGES,
 ];
 
 const SettingsBar: React.FC<SettingsBarProps> = ({ config, onChange }) => {
@@ -60,7 +65,7 @@ const SettingsBar: React.FC<SettingsBarProps> = ({ config, onChange }) => {
               className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 appearance-none cursor-pointer"
             >
               <option value="Auto-detect">Auto-detect Language</option>
-              {LANGUAGES.map(lang => (
+              {SOURCE_LANGUAGES.map(lang => (
                 <option key={`src-${lang}`} value={lang}>{lang}</option>
               ))}
             </select>
@@ -72,7 +77,7 @@ const SettingsBar: React.FC<SettingsBarProps> = ({ config, onChange }) => {
               onChange={(e) => onChange({ targetLang: e.target.value })}
               className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 appearance-none cursor-pointer"
             >
-              {LANGUAGES.map(lang => (
+              {TARGET_LANGUAGES.map(lang => (
                 <option key={`tgt-${lang}`} value={lang}>{lang}</option>
               ))}
             </select>

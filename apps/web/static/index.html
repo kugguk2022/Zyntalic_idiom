@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zyntalic</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f2efe9;
+      --ink: #1b1b1b;
+      --muted: #5a5a5a;
+      --accent: #1f6f4a;
+      --panel: #ffffff;
+      --border: #d5cfc3;
+      --shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Serif", "Georgia", serif;
+      background: radial-gradient(circle at 10% 20%, #fff7ea 0%, #f2efe9 35%, #e7e0d4 100%);
+      color: var(--ink);
+    }
+    .wrap {
+      max-width: 900px;
+      margin: 8vh auto;
+      padding: 24px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      border-radius: 18px;
+      padding: 28px;
+    }
+    h1 {
+      font-size: 2.2rem;
+      margin: 0 0 8px 0;
+      letter-spacing: 0.3px;
+    }
+    p {
+      margin: 10px 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+    .btn {
+      text-decoration: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      color: var(--ink);
+      background: #fff;
+      font-size: 0.95rem;
+    }
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    code {
+      background: #f6f2ea;
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid #e5dfd4;
+    }
+    .note {
+      font-size: 0.9rem;
+      margin-top: 18px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      font-family: "IBM Plex Sans", "Arial", sans-serif;
+      font-size: 1rem;
+      resize: vertical;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .label {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .output {
+      min-height: 120px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      background: #faf7f0;
+      font-family: "IBM Plex Sans", "Arial", sans-serif;
+      white-space: pre-wrap;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    input[type="range"] {
+      width: 180px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Zyntalic Translator (Fallback UI)</h1>
+      <p>The full React UI isn't built, so this lightweight translator is active.</p>
+
+      <div class="row">
+        <div>
+          <div class="label">Source (English)</div>
+          <textarea id="source" placeholder="Enter text to translate"></textarea>
+        </div>
+        <div>
+          <div class="label">Target (Zyntalic)</div>
+          <div id="output" class="output">Waiting for input…</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <label class="label">Engine:</label>
+        <select id="engine" class="btn">
+          <option value="core" selected>core</option>
+          <option value="transformer">transformer</option>
+          <option value="chiasmus">chiasmus</option>
+          <option value="test_suite">test_suite</option>
+        </select>
+
+        <label class="label" for="mirror">Mirror Rate</label>
+        <input id="mirror" type="range" min="0" max="1" step="0.05" value="0.3" />
+        <span id="mirrorVal">0.3</span>
+
+        <button id="translateBtn" class="btn primary">Translate → Zyntalic</button>
+        <a class="btn" href="/docs">API Docs</a>
+      </div>
+
+      <p class="note">Build the full UI any time: <code>cd zyntalic-flow && npm install && npm run build</code></p>
+    </div>
+  </div>
+  <script>
+    const source = document.getElementById("source");
+    const output = document.getElementById("output");
+    const engine = document.getElementById("engine");
+    const mirror = document.getElementById("mirror");
+    const mirrorVal = document.getElementById("mirrorVal");
+    const btn = document.getElementById("translateBtn");
+
+    mirror.addEventListener("input", () => {
+      mirrorVal.textContent = mirror.value;
+    });
+
+    async function translate() {
+      const text = source.value.trim();
+      if (!text) {
+        output.textContent = "Please enter text.";
+        return;
+      }
+      output.textContent = "Translating…";
+      try {
+        const resp = await fetch("/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            mirror_rate: parseFloat(mirror.value),
+            engine: engine.value
+          })
+        });
+        const data = await resp.json();
+        if (data.rows && data.rows[0]) {
+          output.textContent = data.rows.map(r => r.target).join("\n\n");
+        } else {
+          output.textContent = JSON.stringify(data, null, 2);
+        }
+      } catch (err) {
+        output.textContent = "Error: " + (err && err.message ? err.message : String(err));
+      }
+    }
+
+    btn.addEventListener("click", translate);
+  </script>
+</body>
+</html>

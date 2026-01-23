@@ -22,10 +22,7 @@ try:
 except ImportError:
     MULTIPART_INSTALLED = False
 
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None
+genai = None
 
 from zyntalic.translator import translate_text, warm_translation_pipeline
 from zyntalic.utils.cache import (
@@ -96,16 +93,15 @@ class TranslateRequest(BaseModel):
     engine: str = "core"  # "core"|"chiasmus"|"transformer"|"test_suite"
 
 
-class GeminiTranslateRequest(BaseModel):
-    text: str
-    mirror_rate: float = 0.3
-    target_lang: str = "English"
-    source_lang: str | None = None
-    engine: str | None = None
-
 @app.get("/")
 def read_root():
-    return FileResponse(static_dir / "index.html")
+    index_path = _find_frontend_file("index.html")
+    if index_path:
+        return FileResponse(index_path)
+    return {
+        "status": "ok",
+        "message": "Frontend build not found. Run: cd zyntalic-flow && npm install && npm run build",
+    }
 
 
 @app.get("/favicon.ico")
@@ -337,58 +333,3 @@ def translate(req: TranslateRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Translation failed: {exc}") from exc
 
-
-def _build_gemini_prompt(req: GeminiTranslateRequest) -> str:
-    is_auto = not req.source_lang or req.source_lang.lower() == "auto-detect"
-    source_clause = (
-        "The source language is unknown. Detect it before translating."
-        if is_auto
-        else f"The source language is {req.source_lang}."
-    )
-    return (
-        "You are the Zyntalic Engine v0.3, a deterministic semantic translation system. "
-        f"Your goal is to translate the input text to {req.target_lang}. "
-        f"{source_clause} "
-        f"The mirror parameter is set to {req.mirror_rate}, where lower skews literal and higher skews semantic flow. "
-        "Respond strictly as JSON with fields translatedText, confidence, detectedSourceLanguage (optional), and semanticNote."
-    )
-
-
-@app.post("/translate/gemini")
-def translate_gemini(req: GeminiTranslateRequest):
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured on the server.")
-
-    if genai is None:
-        raise HTTPException(
-            status_code=501,
-            detail="google-generativeai not installed. Run: pip install .[web,gemini]",
-        )
-
-    genai.configure(api_key=api_key)
-    prompt = _build_gemini_prompt(req)
-    start = time.time()
-
-    try:
-        model = genai.GenerativeModel("gemini-1.5-pro-002")
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": req.mirror_rate,
-                "response_mime_type": "application/json",
-            },
-        )
-        payload = json.loads(response.text or "{}")
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"Gemini request failed: {exc}") from exc
-
-    latency_ms = int((time.time() - start) * 1000)
-
-    return {
-        "translated_text": payload.get("translatedText") or "Translation failed to parse.",
-        "latency_ms": latency_ms,
-        "confidence": payload.get("confidence", 1.0),
-        "detected_source_language": payload.get("detectedSourceLanguage"),
-        "semantic_note": payload.get("semanticNote"),
-    }
