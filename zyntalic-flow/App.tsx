@@ -22,6 +22,11 @@ const App: React.FC = () => {
     targetLang: 'Zyntalic'
   });
 
+  const latencyMs = outputResult?.latency ?? null;
+  const latencyPct = latencyMs ? Math.min(100, (latencyMs / 5000) * 100) : 0;
+  const speedLabel = latencyMs == null ? '--' : latencyMs < 800 ? 'Fast' : latencyMs < 2000 ? 'Medium' : 'Slow';
+  const msPerChar = latencyMs && inputText.length > 0 ? (latencyMs / inputText.length) : null;
+
   const handleTranslate = async () => {
     if (!inputText.trim()) return;
     
@@ -173,12 +178,30 @@ const App: React.FC = () => {
         <aside className="lg:col-span-3 space-y-6">
           <SettingsBar config={config} onChange={(upd) => setConfig(prev => ({ ...prev, ...upd }))} />
           
-          <div className="bg-slate-900/30 border border-slate-800/50 p-6 rounded-2xl hidden lg:block hover:bg-slate-900/40 transition-colors duration-300">
+            <div className="bg-slate-900/30 border border-slate-800/50 p-6 rounded-2xl hidden lg:block hover:bg-slate-900/40 transition-colors duration-300">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Diagnostics</h3>
             <div className="space-y-3">
               <div className="flex justify-between text-xs group">
                 <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Latency</span>
-                <span className="mono text-slate-300 tabular-nums">{outputResult?.latency || '--'}ms</span>
+                <span className="mono text-slate-300 tabular-nums">{latencyMs ?? '--'}ms</span>
+              </div>
+              <div className="flex justify-between text-xs group">
+                <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Speed</span>
+                <span className="mono text-slate-300 tabular-nums">
+                  {speedLabel}{msPerChar ? ` · ${msPerChar.toFixed(1)} ms/char` : ''}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs group">
+                  <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Time to Finish</span>
+                  <span className="mono text-slate-300 tabular-nums">{latencyMs ?? '--'}ms</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-slate-800/70 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 transition-all duration-500"
+                    style={{ width: `${latencyPct}%` }}
+                  />
+                </div>
               </div>
               <div className="flex justify-between text-xs group">
                 <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Confidence</span>
