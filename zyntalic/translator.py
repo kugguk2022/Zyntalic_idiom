@@ -48,16 +48,24 @@ def warm_translation_pipeline() -> None:
     except Exception as exc:  # pragma: no cover - defensive guard
         print(f"[warmup] Warning: preload skipped due to: {exc}")
 
-def mirror_readback(seed_text: str, anchors):
-    """Build a deterministic mirror-readable English line from anchors."""
+def mirror_readback(seed_text: str, anchors, mirror_terms: Optional[List[Dict[str, str]]] = None):
+    """Build a deterministic mirror-readable English line from anchors or mirror terms."""
     try:
-        if not anchors:
-            vec = core.base_embedding(seed_text or "", dim=300)
-            anchors = core.anchor_weights_for_vec(vec, top_k=2)
-        names = [name for name, _ in anchors] if anchors else core.ANCHORS[:2]
-        weights = [w for _, w in anchors] if anchors else [0.5, 0.5]
         rng = get_rng(f"mirror-readback::{seed_text}")
-        A, B = core._choose_motif(rng, names, weights)  # type: ignore[attr-defined]
+        if mirror_terms:
+            try:
+                (A, _), (B, _) = core._pick_pair_from_terms(rng, mirror_terms)  # type: ignore[attr-defined]
+            except Exception:
+                A = B = None
+        else:
+            A = B = None
+        if not A or not B:
+            if not anchors:
+                vec = core.base_embedding(seed_text or "", dim=300)
+                anchors = core.anchor_weights_for_vec(vec, top_k=2)
+            names = [name for name, _ in anchors] if anchors else core.ANCHORS[:2]
+            weights = [w for _, w in anchors] if anchors else [0.5, 0.5]
+            A, B = core._choose_motif(rng, names, weights)  # type: ignore[attr-defined]
         templates = getattr(core, "_EN_MIRROR_TEMPLATES", ["To {A} through {B}; to {B} through {A}."])
         t = rng.choice(templates)
         return t.format(A=A, B=B)
@@ -74,6 +82,42 @@ def _clean_lemma(text: str) -> str:
     t = re.sub(r"[^A-Za-z0-9'\- ]+", " ", t.lower())
     t = re.sub(r"\s+", " ", t).strip()
     return t.split()[0] if t else ""
+
+
+def _extract_mirror_terms(text: str) -> List[Dict[str, str]]:
+    vocab = core.load_vocabulary_mappings()
+    noun_keys = set(vocab.get("nouns", {}).keys())
+    verb_keys = set(vocab.get("verbs", {}).keys())
+    adj_keys = set(vocab.get("adjectives", {}).keys())
+    stop = {"the", "and", "of", "to", "in", "a", "an", "is", "are", "was", "were"}
+    terms: List[Dict[str, str]] = []
+    seen = set()
+    for tok in nlp.analyze_tokens(text):
+        lemma = (tok.get("lemma") or tok.get("text") or "").lower()
+        if not lemma or lemma in stop or len(lemma) < 3:
+            continue
+        pos = None
+        if lemma in noun_keys:
+            pos = "nouns"
+        elif lemma in verb_keys:
+            pos = "verbs"
+        elif lemma in adj_keys:
+            pos = "adjectives"
+        if pos is None:
+            pos_hint = (tok.get("pos") or "").lower()
+            if pos_hint in ("noun", "propn"):
+                pos = "nouns"
+            elif pos_hint == "verb":
+                pos = "verbs"
+            elif pos_hint == "adj":
+                pos = "adjectives"
+        if pos is None:
+            pos = "nouns"
+        if pos and lemma not in seen:
+            seen.add(lemma)
+            mirror = core._mirror_term(lemma)  # type: ignore[attr-defined]
+            terms.append({"term": lemma, "pos": pos, "mirror": mirror or ""})
+    return terms
 
 
 def translate_sentence(
@@ -96,13 +140,21 @@ def translate_sentence(
     src = (text or "").strip()
     lemma = _clean_lemma(src)
 
+    mirror_terms = _extract_mirror_terms(src)
+
     if engine == "test_suite":
         try:
             from .test_suite import ZyntalicTestSuite
             # Run a quick validation test for the input
             test_suite = ZyntalicTestSuite()
             # Use core engine for actual translation but add test metadata
-            entry = core.generate_entry(lemma or src, mirror_rate=mirror_rate, W=W, mirror_state=mirror_state)
+            entry = core.generate_entry(
+                lemma or src,
+                mirror_rate=mirror_rate,
+                W=W,
+                mirror_state=mirror_state,
+                mirror_terms=mirror_terms,
+            )
             row = {
                 "source": src,
                 "target": entry["sentence"],
@@ -113,7 +165,7 @@ def translate_sentence(
                 "test_info": "Input validated with test suite"
             }
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(lemma or src, entry.get("anchors", []))
+                row["mirror_text"] = mirror_readback(lemma or src, entry.get("anchors", []), mirror_terms=mirror_terms)
             return row
         except Exception as e:
             # Fall back to core if test suite fails
@@ -124,7 +176,7 @@ def translate_sentence(
             from .reverse import reverse_translate_sentence
             row = reverse_translate_sentence(src)
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(src, row.get("anchors", []))
+                row["mirror_text"] = mirror_readback(src, row.get("anchors", []), mirror_terms=mirror_terms)
             return row
         except Exception:
             engine = "core"
@@ -140,7 +192,7 @@ def translate_sentence(
                 "engine": "transformer",
             }
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(src, row.get("anchors", []))
+                row["mirror_text"] = mirror_readback(src, row.get("anchors", []), mirror_terms=mirror_terms)
             return row
         except Exception as e:
             # print(f"Transformer error: {e}") # debug
@@ -158,7 +210,7 @@ def translate_sentence(
                 "engine": "chiasmus",
             }
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(src, row.get("anchors", []))
+                row["mirror_text"] = mirror_readback(src, row.get("anchors", []), mirror_terms=mirror_terms)
             return row
         except Exception:
             # fall back to core
@@ -169,6 +221,7 @@ def translate_sentence(
         mirror_rate=mirror_rate,
         W=W or _PROJECTION_W,
         mirror_state=mirror_state,
+        mirror_terms=mirror_terms,
     )
     # entry contains 'sentence' (with ctx tail) and anchor weights
     row = {
@@ -180,7 +233,7 @@ def translate_sentence(
         "embedding": entry.get("embedding"),
     }
     if mirror_rate > 0.75:
-        row["mirror_text"] = mirror_readback(lemma or src, entry.get("anchors", []))
+        row["mirror_text"] = mirror_readback(lemma or src, entry.get("anchors", []), mirror_terms=mirror_terms)
     return row
 
 

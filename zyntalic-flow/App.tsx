@@ -179,9 +179,13 @@ const App: React.FC = () => {
         <aside className="lg:col-span-3 space-y-6">
           <SettingsBar config={config} onChange={(upd) => setConfig(prev => ({ ...prev, ...upd }))} />
           
-            <div className="bg-slate-900/30 border border-slate-800/50 p-6 rounded-2xl hidden lg:block hover:bg-slate-900/40 transition-colors duration-300">
+            <div className="bg-slate-900/30 border border-slate-800/50 p-6 rounded-2xl hover:bg-slate-900/40 transition-colors duration-300">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Diagnostics</h3>
             <div className="space-y-3">
+              <div className="flex justify-between text-xs group">
+                <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Temperature</span>
+                <span className="mono text-slate-300 tabular-nums">{config.mirror.toFixed(2)}</span>
+              </div>
               <div className="flex justify-between text-xs group">
                 <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Latency</span>
                 <span className="mono text-slate-300 tabular-nums">{latencyMs ?? '--'}ms</span>
