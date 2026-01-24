@@ -122,6 +122,33 @@ POLISH_VOWELS = "aąeęioóuy"
 
 # Strict vocab mode avoids generated syllables and keeps outputs within known mappings.
 _STRICT_VOCAB = os.getenv("ZYNTALIC_STRICT_VOCAB", "1").lower() not in ("0", "false", "no", "off")
+_CTX_READBACK = os.getenv("ZYNTALIC_CTX_READBACK", "0").lower() in ("1", "true", "yes", "on")
+try:
+    _CTX_KEYWORD_COUNT = max(1, int(os.getenv("ZYNTALIC_CTX_KEYWORDS", "3") or "3"))
+except Exception:
+    _CTX_KEYWORD_COUNT = 3
+
+# Bound affixes for rhythm.
+_AFFIX_PREFIXES = ["na", "ve", "sy", "lu", "ta", "ri"]
+_AFFIX_SUFFIXES = ["ek", "is", "or", "um", "ja", "ti", "en", "os", "ar", "ul"]
+try:
+    _AFFIX_PREFIX_RATE = float(os.getenv("ZYNTALIC_PREFIX_RATE", "0.28"))
+except Exception:
+    _AFFIX_PREFIX_RATE = 0.28
+try:
+    _AFFIX_SUFFIX_RATE = float(os.getenv("ZYNTALIC_SUFFIX_RATE", "0.72"))
+except Exception:
+    _AFFIX_SUFFIX_RATE = 0.72
+
+# Short sentence particles (standalone tokens).
+_SENTENCE_PARTICLES = ["ne", "ra", "lo", "ka", "se", "ti"]
+try:
+    _PARTICLE_RATE = float(os.getenv("ZYNTALIC_PARTICLE_RATE", "0.5"))
+except Exception:
+    _PARTICLE_RATE = 0.5
+
+# Fixed pivot connectors for mirrors (proverb feel).
+_MIRROR_PIVOTS = ["na", "ve", "sy", "lu"]
 
 _MIRROR_LEXICON_PATH = os.path.join("data", "embeddings", "mirror_lexicon.json")
 _MIRROR_LEXICON: Optional[Dict[str, str]] = None
@@ -577,7 +604,13 @@ def generate_word(seed_key: str) -> str:
     ]
     if rng.random() < 0.3:
         sylls[1] = fuse_syllables(sylls[1], rng.choice(["ć", "ść", "rz", "ż"]))
-    return "".join(sylls)
+    word = "".join(sylls)
+    # Bound affixes for rhythm (deterministic via RNG).
+    if _AFFIX_PREFIXES and rng.random() < _AFFIX_PREFIX_RATE:
+        word = rng.choice(_AFFIX_PREFIXES) + word
+    if _AFFIX_SUFFIXES and rng.random() < _AFFIX_SUFFIX_RATE:
+        word = word + rng.choice(_AFFIX_SUFFIXES)
+    return word
 
 
 # -------------------- Sentence Templates --------------------
@@ -651,6 +684,7 @@ def _mirror_tokens() -> List[str]:
     global _MIRROR_TOKENS
     if _MIRROR_TOKENS is not None:
         return _MIRROR_TOKENS
+    pivots = list(dict.fromkeys(_MIRROR_PIVOTS))
     if _STRICT_VOCAB:
         vocab = load_vocabulary_mappings()
         verbs = list(vocab.get("verbs", {}).values())
@@ -667,11 +701,14 @@ def _mirror_tokens() -> List[str]:
             _MIRROR_TOKENS = picks or verbs[:8]
         else:
             _MIRROR_TOKENS = []
+        for pivot in pivots:
+            if pivot not in _MIRROR_TOKENS:
+                _MIRROR_TOKENS.append(pivot)
     else:
         seeds = [
             "by", "through", "via", "path", "echo", "return", "fold", "turn", "bind", "mirror"
         ]
-        _MIRROR_TOKENS = [generate_word(f"mirror::{s}") for s in seeds]
+        _MIRROR_TOKENS = [generate_word(f"mirror::{s}") for s in seeds] + pivots
     return _MIRROR_TOKENS
 
 def _map_motif_word(word: str, *, rng, field: str = "nouns") -> str:
@@ -758,7 +795,7 @@ def mirrored_sentence_anchored(
     anchors,
     weights,
     mirror_state: Optional[MirrorState] = None,
-    mirror_terms: Optional[List[str]] = None,
+    mirror_terms: Optional[List[Dict[str, str]]] = None,
 ) -> str:
     """Chiasmus style (Zyntalic mirror templates)."""
     if mirror_terms and len(mirror_terms) >= 2:
@@ -850,6 +887,11 @@ def plain_sentence_anchored(rng, anchors, weights) -> str:
     if not verb:
         verb = generate_word(f"verb::{verb_en}")
 
+    particle = ""
+    if _SENTENCE_PARTICLES and rng.random() < _PARTICLE_RATE:
+        particle = rng.choice(_SENTENCE_PARTICLES)
+    if particle:
+        return f"{adj} {noun} {verb} {particle}"
     return f"{adj} {noun} {verb}"
 
 
@@ -864,10 +906,19 @@ def make_korean_tail(seed_key: str) -> str:
 
 
 # -------------------- Context Block --------------------
-def make_context(seed_key: str, word: str, chosen_anchors: List[str], pos_hint: str) -> str:
+def make_context(
+    seed_key: str,
+    word: str,
+    chosen_anchors: List[str],
+    pos_hint: str,
+    ctx_terms: Optional[List[str]] = None,
+) -> str:
     lemma = lemmatize(word)
     ctx_anchors = "|".join(chosen_anchors)
     han = make_korean_tail(seed_key or lemma)
+    if _CTX_READBACK and ctx_terms:
+        keys = "|".join(ctx_terms[:2])
+        return f"⟦ctx:han={han}; key={keys}⟧"
     # Only show the Korean tail, hide metadata
     return f"⟦ctx:han={han}⟧"
 
@@ -964,7 +1015,7 @@ def generate_entry(
     mirror_rate: float = 0.3,
     W=None,
     mirror_state: Optional[MirrorState] = None,
-    mirror_terms: Optional[List[str]] = None,
+    mirror_terms: Optional[List[Dict[str, str]]] = None,
 ) -> Dict:
     """
     Generate a full dictionary entry deterministically.
@@ -983,6 +1034,23 @@ def generate_entry(
     chosen = [name for name, _ in aw]
     weights = [wgt for _, wgt in aw]
 
+    # Optional context keywords for readback mode.
+    ctx_terms = None
+    if _CTX_READBACK and mirror_terms:
+        ctx_terms = []
+        for t in mirror_terms:
+            if len(ctx_terms) >= max(1, _CTX_KEYWORD_COUNT):
+                break
+            if isinstance(t, dict):
+                term = t.get("term") or ""
+                field = t.get("pos") or "nouns"
+            else:
+                term = str(t)
+                field = "nouns"
+            if not term:
+                continue
+            ctx_terms.append(_map_term_to_zyntalic(term, field, rng=rng))
+
     # 3. Sentence
     if rng.random() < mirror_rate:
         sent_core = mirrored_sentence_anchored(
@@ -996,7 +1064,7 @@ def generate_entry(
         sent_core = plain_sentence_anchored(rng, chosen, weights)
 
     # 4. Context (kept at the end per S-O-V-C rule)
-    sentence = f"{sent_core} {make_context(seed_word, w, chosen, pos_hint)}"
+    sentence = f"{sent_core} {make_context(seed_word, w, chosen, pos_hint, ctx_terms=ctx_terms)}"
 
     return {
         "word": w,
