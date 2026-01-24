@@ -10,6 +10,7 @@ This wraps the deterministic core into a stable interface usable by:
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Dict, List, Optional
 
@@ -82,6 +83,57 @@ def _clean_lemma(text: str) -> str:
     t = re.sub(r"[^A-Za-z0-9'\- ]+", " ", t.lower())
     t = re.sub(r"\s+", " ", t).strip()
     return t.split()[0] if t else ""
+
+def _batch_max_chars() -> int:
+    raw = os.getenv("ZYNTALIC_BATCH_CHARS", "400").strip()
+    try:
+        return max(0, int(raw))
+    except Exception:
+        return 400
+
+def _split_into_batches(text: str, max_chars: int) -> List[str]:
+    if max_chars <= 0:
+        return [text] if text else []
+    s = (text or "").strip()
+    if not s:
+        return []
+    if len(s) <= max_chars:
+        return [s]
+
+    # Prefer splitting on natural boundaries within the max window.
+    boundary_patterns = (
+        r"\n\n",
+        r"\n",
+        r"[.!?]\s",
+        r";\s",
+        r",\s",
+    )
+    min_size = max(40, int(max_chars * 0.5))
+    chunks: List[str] = []
+
+    while s:
+        if len(s) <= max_chars:
+            chunks.append(s.strip())
+            break
+        window = s[: max_chars + 1]
+        candidates: List[int] = []
+        for pattern in boundary_patterns:
+            for m in re.finditer(pattern, window):
+                candidates.append(m.end())
+        if candidates:
+            # Choose the best candidate at or above min_size; otherwise the last boundary.
+            viable = [c for c in candidates if c >= min_size]
+            cut = max(viable) if viable else max(candidates)
+        else:
+            cut = max_chars
+        chunk = s[:cut].strip()
+        if not chunk:
+            cut = max_chars
+            chunk = s[:cut].strip()
+        chunks.append(chunk)
+        s = s[cut:].lstrip()
+
+    return chunks
 
 
 def _extract_mirror_terms(text: str) -> List[Dict[str, str]]:
@@ -251,7 +303,10 @@ def translate_text(
     text = (text or "").strip()
     if not text:
         return []
-    parts = nlp.split_sentences(text)
+    max_chars = _batch_max_chars()
+    parts: List[str] = []
+    for batch in _split_into_batches(text, max_chars):
+        parts.extend(nlp.split_sentences(batch))
     mirror_state = core.MirrorState()
     rows = []
     for p in parts:
