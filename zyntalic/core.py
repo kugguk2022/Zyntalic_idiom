@@ -271,20 +271,31 @@ def _choose_motif(rng, anchors, weights):
                 if isinstance(pair, list) and len(pair) == 2:
                     motif_pool.append(tuple(pair))
                     motif_w.append(max(1e-6, w))
+        # Augment with a couple of anchor-specific pairs to reduce repetition.
+        data = lex.get(a, {})
+        nouns = data.get("nouns", [])
+        verbs = data.get("verbs", [])
+        if len(nouns) >= 2:
+            i = int(rng.random() * len(nouns))
+            j = int(rng.random() * len(nouns))
+            if j == i:
+                j = (i + 1) % len(nouns)
+            motif_pool.append((nouns[i], nouns[j]))
+            motif_w.append(max(1e-6, w * 0.6))
+        if len(verbs) >= 2:
+            i = int(rng.random() * len(verbs))
+            j = int(rng.random() * len(verbs))
+            if j == i:
+                j = (i + 1) % len(verbs)
+            motif_pool.append((verbs[i], verbs[j]))
+            motif_w.append(max(1e-6, w * 0.4))
+    # Always add a broader default motif pool at low weight to reduce repetition.
+    for pair in _DEFAULT_MOTIFS:
+        motif_pool.append(pair)
+        motif_w.append(0.2)
     if motif_pool:
         return _weighted_sample(rng, motif_pool, motif_w)
-    # fallback generic motifs
-    defaults = [
-        ("light", "dark"),
-        ("order", "chaos"),
-        ("silence", "noise"),
-        ("rise", "fall"),
-        ("future", "past"),
-        ("open", "closed"),
-        ("presence", "absence"),
-        ("truth", "doubt"),
-    ]
-    return defaults[int(rng.random() * len(defaults))]
+    return _DEFAULT_MOTIFS[int(rng.random() * len(_DEFAULT_MOTIFS))]
 
 
 # -------------------- Helpers --------------------
@@ -372,19 +383,89 @@ def generate_word(seed_key: str) -> str:
 
 
 # -------------------- Sentence Templates --------------------
-TEMPLATES = [
+_MIRROR_STYLE = os.getenv("ZYNTALIC_MIRROR_STYLE", "zyntalic").strip().lower()
+
+_EN_MIRROR_TEMPLATES = [
     "To {A} through {B}; to {B} through {A}.",
     "{A} begets {B}, and {B} reframes {A}.",
     "Seek {A} by {B}; keep {B} by {A}.",
     "Between {A} and {B}, the path mirrors back from {B} to {A}.",
 ]
 
+_ZY_MIRROR_TEMPLATES = [
+    "{A} {c} {B}; {B} {c} {A}.",
+    "{A} {c} {B} · {B} {c} {A}.",
+    "{A} {c} {B} ↔ {B} {c} {A}.",
+    "{A} {c} {B} ⇄ {B} {c} {A}.",
+    "{A} {c} {B} / {B} {c} {A}.",
+]
+
+_DEFAULT_MOTIFS = [
+    ("order", "chaos"),
+    ("light", "dark"),
+    ("spirit", "flesh"),
+    ("time", "eternity"),
+    ("silence", "noise"),
+    ("truth", "doubt"),
+    ("memory", "forgetting"),
+    ("fire", "water"),
+    ("stone", "wind"),
+    ("path", "wall"),
+    ("rise", "fall"),
+    ("birth", "death"),
+    ("dream", "wake"),
+    ("north", "south"),
+    ("east", "west"),
+    ("body", "shadow"),
+    ("voice", "echo"),
+    ("root", "branch"),
+    ("seed", "ash"),
+    ("gold", "iron"),
+    ("mirror", "veil"),
+    ("open", "closed"),
+    ("near", "far"),
+    ("inside", "outside"),
+    ("center", "edge"),
+    ("shape", "void"),
+    ("law", "breach"),
+    ("hunger", "satiety"),
+    ("blood", "snow"),
+    ("eye", "mask"),
+    ("sun", "moon"),
+    ("storm", "calm"),
+]
+
+_MIRROR_TOKENS = None
+
+def _mirror_tokens() -> List[str]:
+    global _MIRROR_TOKENS
+    if _MIRROR_TOKENS is not None:
+        return _MIRROR_TOKENS
+    seeds = [
+        "by", "through", "via", "path", "echo", "return", "fold", "turn", "bind", "mirror"
+    ]
+    _MIRROR_TOKENS = [generate_word(f"mirror::{s}") for s in seeds]
+    return _MIRROR_TOKENS
+
+def _map_motif_word(word: str) -> str:
+    vocab = load_vocabulary_mappings()
+    key = (word or "").strip().lower()
+    mapped = vocab.get("nouns", {}).get(key)
+    return mapped or generate_word(f"motif::{key}")
+
 
 def mirrored_sentence_anchored(rng, anchors, weights) -> str:
     """Chiasmus style."""
     A, B = _choose_motif(rng, anchors, weights)
-    t = rng.choice(TEMPLATES)
-    return t.format(A=A, B=B)
+    if _MIRROR_STYLE == "english":
+        t = rng.choice(_EN_MIRROR_TEMPLATES)
+        return t.format(A=A, B=B)
+    # Zyntalic mirror rendering (keeps the chiasmus structure without English text)
+    A_z = _map_motif_word(A)
+    B_z = _map_motif_word(B)
+    connector = rng.choice(_mirror_tokens())
+    t = rng.choice(_ZY_MIRROR_TEMPLATES)
+    return t.format(A=A_z, B=B_z, c=connector)
 
 
 def plain_sentence_anchored(rng, anchors, weights) -> str:

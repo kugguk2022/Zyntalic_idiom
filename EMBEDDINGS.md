@@ -74,8 +74,13 @@ translate_text("Hello world", engine='test_suite')
 The `mirror_rate` controls the balance between:
 - **Low (0.0-0.3)**: More Zyntalic vocabulary (Hangul + Polish)
   - Example: `엢낯풿극 źęg옶fek żaźa낈źó`
-- **High (0.7-1.0)**: More English-like chiasmus templates
-  - Example: `To light through dark; to dark through light.`
+- **High (0.7-1.0)**: More Zyntalic chiasmus templates (mirror structure without English)
+  - Example pattern: `<A> <zy-connector> <B> · <B> <zy-connector> <A>`
+
+If you prefer the legacy English mirror templates, set:
+```bash
+export ZYNTALIC_MIRROR_STYLE=english
+```
 
 **Recommended**: `0.3` for authentic Zyntalic output
 
