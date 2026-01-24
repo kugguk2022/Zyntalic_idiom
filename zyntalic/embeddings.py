@@ -4,6 +4,7 @@ Embedding backend for Zyntalic.
 
 - If `sentence-transformers` is installed, we use a small model.
 - Otherwise we fall back to deterministic hash-based pseudo-embeddings.
+  Choose the model via `ZYNTALIC_EMBEDDING_MODEL` (default: all-MiniLM-L6-v2).
 
 This keeps the repo runnable in offline/minimal environments while still allowing
 a better backend when you want it.
@@ -22,6 +23,25 @@ from pathlib import Path
 
 _MODEL = None
 _DIM: Optional[int] = None
+
+_DEFAULT_MODEL = "all-MiniLM-L6-v2"
+_MODEL_NAME = os.getenv("ZYNTALIC_EMBEDDING_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
+
+_MODEL_ALIASES = {
+    "all-minilm-l6-v2": "all-MiniLM-L6-v2",
+    "minilm": "all-MiniLM-L6-v2",
+    "mini-lm": "all-MiniLM-L6-v2",
+    "bge-small-en-v1.5": "BAAI/bge-small-en-v1.5",
+    "bge-small": "BAAI/bge-small-en-v1.5",
+}
+
+
+def _resolve_model_name(name: str) -> str:
+    if not name:
+        return _DEFAULT_MODEL
+    key = name.strip()
+    lower = key.lower()
+    return _MODEL_ALIASES.get(lower, key)
 
 # When set, skip loading sentence-transformers and use fast hash-based embeddings only.
 _HASH_ONLY = os.getenv("ZYNTALIC_FAST", "").lower() in ("1", "true", "yes", "on") or os.getenv("ZYNTALIC_HASH_ONLY", "").lower() in ("1", "true", "yes", "on")
@@ -149,7 +169,14 @@ def _lazy_load_model() -> None:
         return
     try:
         from sentence_transformers import SentenceTransformer  # type: ignore
-        _MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+        model_name = _resolve_model_name(_MODEL_NAME)
+        try:
+            _MODEL = SentenceTransformer(model_name)
+        except Exception:
+            if model_name != _DEFAULT_MODEL:
+                _MODEL = SentenceTransformer(_DEFAULT_MODEL)
+            else:
+                raise
         _DIM = int(_MODEL.get_sentence_embedding_dimension())
     except Exception:
         _MODEL = None

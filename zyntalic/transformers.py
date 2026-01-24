@@ -4,6 +4,7 @@ Transformer-based engine for Zyntalic.
 Uses sentence-transformers to find the closest "Schelling point" in the anchor space.
 """
 from typing import List, Dict
+import os
 import numpy as np
 
 try:
@@ -12,6 +13,15 @@ except ImportError:
     SentenceTransformer = None
 
 _MODEL = None
+_DEFAULT_MODEL = "all-MiniLM-L6-v2"
+_MODEL_NAME = os.getenv("ZYNTALIC_EMBEDDING_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
+_MODEL_ALIASES = {
+    "all-minilm-l6-v2": "all-MiniLM-L6-v2",
+    "minilm": "all-MiniLM-L6-v2",
+    "mini-lm": "all-MiniLM-L6-v2",
+    "bge-small-en-v1.5": "BAAI/bge-small-en-v1.5",
+    "bge-small": "BAAI/bge-small-en-v1.5",
+}
 
 from . import core
 
@@ -28,7 +38,14 @@ def get_model():
     if _MODEL is None:
         try:
             # resilient, lightweight model
-            _MODEL = SentenceTransformer('all-MiniLM-L6-v2')
+            name = _MODEL_ALIASES.get(_MODEL_NAME.lower(), _MODEL_NAME)
+            try:
+                _MODEL = SentenceTransformer(name)
+            except Exception:
+                if name != _DEFAULT_MODEL:
+                    _MODEL = SentenceTransformer(_DEFAULT_MODEL)
+                else:
+                    raise
         except Exception:
             _MODEL = None
             

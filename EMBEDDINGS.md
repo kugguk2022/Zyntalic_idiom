@@ -290,6 +290,30 @@ scripts/
 - **Batch processing**: ~10-20 sentences/second
 - **Memory usage**: ~200MB (with sentence-transformers)
 
+## Embedding Model Selection
+
+Default model:
+- `all-MiniLM-L6-v2`
+
+Optional higher-accuracy model:
+- `BAAI/bge-small-en-v1.5` (install with `pip install .[embeddings-bge]`)
+
+To override the model at runtime:
+```bash
+export ZYNTALIC_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+```
+
+Accepted aliases:
+- `bge-small-en-v1.5` -> `BAAI/bge-small-en-v1.5`
+- `minilm` -> `all-MiniLM-L6-v2`
+
+If the selected model fails to load, Zyntalic retries the default
+`all-MiniLM-L6-v2` and then falls back to deterministic hash embeddings.
+
+Note: If model failures are noticeable for your use case, consider making
+`BAAI/bge-small-en-v1.5` the default after benchmarking on your idiom/anchor
+dataset (expect ~50% extra memory/time).
+
 ## Future Enhancements
 
 - [ ] Morphological analyzer for better POS tagging
@@ -312,6 +336,7 @@ To extend the vocabulary:
 - Hangul Unicode Range: U+AC00 - U+D7AF
 - Polish Diacritics: ą, ć, ę, ł, ń, ó, ś, ź, ż
 - Sentence Transformers: `all-MiniLM-L6-v2` model
+- Sentence Transformers (optional): `BAAI/bge-small-en-v1.5` model
 - Cultural Anchors: Project Gutenberg corpus
 
 ## License
