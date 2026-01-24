@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const latencyPct = latencyMs ? Math.min(100, (latencyMs / 5000) * 100) : 0;
   const speedLabel = latencyMs == null ? '--' : latencyMs < 800 ? 'Fast' : latencyMs < 2000 ? 'Medium' : 'Slow';
   const msPerChar = latencyMs && inputText.length > 0 ? (latencyMs / inputText.length) : null;
+  const showMirror = !!outputResult?.mirrorText && config.mirror > 0.75;
 
   const handleTranslate = async () => {
     if (!inputText.trim()) return;
@@ -205,7 +206,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex justify-between text-xs group">
                 <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Confidence</span>
-                <span className="mono text-slate-300 tabular-nums">{(outputResult?.confidence || 0 * 100).toFixed(1)}%</span>
+                <span className="mono text-slate-300 tabular-nums">{((outputResult?.confidence ?? 0) * 100).toFixed(1)}%</span>
               </div>
               <div className="flex justify-between text-xs group">
                 <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Entropy</span>
@@ -318,6 +319,14 @@ const App: React.FC = () => {
                   </div>
                 )}
               </div>
+              {showMirror && (
+                <div className="border-t border-slate-800/60 bg-slate-950/40 p-6">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mirror Readback</div>
+                  <div className="mt-3 text-slate-200 mono whitespace-pre-wrap">
+                    {outputResult?.mirrorText}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

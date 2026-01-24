@@ -14,6 +14,7 @@ const SOURCE_LANGUAGES = [
 ];
 
 const SettingsBar: React.FC<SettingsBarProps> = ({ config, onChange }) => {
+  const targetLabel = config.engine.includes("Reverse") ? "English" : "Zyntalic";
   return (
     <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-8 backdrop-blur-sm">
       <div className="space-y-4">
@@ -68,7 +69,7 @@ const SettingsBar: React.FC<SettingsBarProps> = ({ config, onChange }) => {
           <div className="space-y-1">
             <span className="text-[10px] text-slate-500 uppercase ml-1">Target</span>
             <div className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm">
-              Zyntalic
+              {targetLabel}
             </div>
           </div>
         </div>

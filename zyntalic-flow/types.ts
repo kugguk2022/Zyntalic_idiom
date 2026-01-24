@@ -3,7 +3,8 @@ export enum TranslationEngine {
   SEMANTIC = 'Transformer (Semantic)',
   NEURAL = 'Neural (Direct)',
   LITERAL = 'Deterministic (Literal)',
-  TEST_SUITE = 'Test Suite (Validation)'
+  TEST_SUITE = 'Test Suite (Validation)',
+  REVERSE = 'Reverse (Zyntalic -> English)'
 }
 
 export interface TranslationConfig {
@@ -18,4 +19,5 @@ export interface TranslationResult {
   detectedSentiment?: string;
   latency: number;
   confidence: number;
+  mirrorText?: string;
 }

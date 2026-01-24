@@ -15,7 +15,9 @@ export const performTranslation = async (
   try {
     // Map frontend engines to backend values
     let engine = "core";
-    if (config.engine.includes("Transformer")) {
+    if (config.engine.includes("Reverse")) {
+        engine = "reverse";
+    } else if (config.engine.includes("Transformer")) {
         engine = "transformer";
     } else if (config.engine.includes("Neural")) {
         engine = "chiasmus";
@@ -51,12 +53,17 @@ export const performTranslation = async (
     const translatedText = rows
       .map((r: any) => r.target || "???")
       .join("\n\n");
+    const mirrorText = rows
+      .map((r: any) => r.mirror_text)
+      .filter((t: string) => t && t.trim().length > 0)
+      .join("\n\n");
 
     return {
       text: translatedText || "No translation generated.",
       latency: endTime - startTime,
       confidence: 1.0, // Backend doesn't give confidence yet
-      detectedSentiment: "English" // Placeholder
+      detectedSentiment: "English", // Placeholder
+      mirrorText: mirrorText || undefined
     };
   } catch (error) {
     console.error("Translation Error:", error);
