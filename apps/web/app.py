@@ -24,7 +24,7 @@ except ImportError:
 
 genai = None
 
-from zyntalic.translator import translate_text, warm_translation_pipeline
+from zyntalic.translator import translate_text, warm_translation_pipeline, mirror_readback
 from zyntalic.logging_utils import get_logger
 from zyntalic.utils.cache import (
     get_cached_translation,
@@ -32,14 +32,14 @@ from zyntalic.utils.cache import (
     init_cache,
 )
 
-# Disable cache via env if needed for batch/PDF flows where users expect fresh outputs
-# Disable cache via env if needed for batch/PDF flows where users expect fresh outputs
-USE_CACHE = False
+# Cache translations by default for repeatability and speed.
+# Disable via env (ZYNTALIC_USE_CACHE=0) if fresh outputs are required.
+USE_CACHE = os.getenv("ZYNTALIC_USE_CACHE", "1").lower() not in ("0", "false", "no", "off")
 
 app = FastAPI(title="Zyntalic API", version="0.3.0")
 logger = get_logger("zyntalic.web")
 MAX_TEXT_CHARS = int(os.getenv("ZYNTALIC_MAX_TEXT_CHARS", "20000"))
-ALLOWED_ENGINES = {"core", "transformer", "chiasmus", "test_suite"}
+ALLOWED_ENGINES = {"core", "transformer", "chiasmus", "test_suite", "reverse"}
 
 try:
     from fastapi.middleware.cors import CORSMiddleware
@@ -319,12 +319,33 @@ def translate(req: TranslateRequest):
             cached = get_cached_translation(text, req.engine, req.mirror_rate)
         if cached:
             logger.info("Translate cache hit")
+            if req.mirror_rate > 0.75 and not cached.get("mirror_text"):
+                cached["mirror_text"] = mirror_readback(
+                    cached.get("source", text),
+                    cached.get("anchors", []),
+                )
+            if req.zyntalic_only:
+                return {
+                    "rows": [
+                        {
+                            "target": cached.get("target", ""),
+                            "mirror_text": cached.get("mirror_text", ""),
+                        }
+                    ],
+                    "cached": True,
+                }
             return {"rows": [cached], "cached": True}
 
         logger.info("Generating translation (cache %s)", "enabled" if USE_CACHE else "disabled")
         rows = translate_text(text, mirror_rate=req.mirror_rate, engine=req.engine)
         if req.zyntalic_only:
-            rows = [{"target": row.get("target", "")} for row in rows]
+            rows = [
+                {
+                    "target": row.get("target", ""),
+                    "mirror_text": row.get("mirror_text", ""),
+                }
+                for row in rows
+            ]
         logger.info("Generated %s translation rows", len(rows))
 
         stored_rows = []
@@ -338,6 +359,7 @@ def translate(req: TranslateRequest):
                     mirror_rate=req.mirror_rate,
                     anchors=row.get("anchors", []),
                     embedding=row.get("embedding") if isinstance(row, dict) else None,
+                    mirror_text=row.get("mirror_text") if isinstance(row, dict) else None,
                 ) if USE_CACHE else row
             )
 

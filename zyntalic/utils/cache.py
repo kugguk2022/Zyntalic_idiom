@@ -8,6 +8,7 @@ Stores entries in JSON at data/cache/translations.json. Each entry includes:
 - mirror_rate (float)
 - anchors (list)
 - embedding (list[float])
+- mirror_text (str)
 - created_at (iso string)
 
 Cache key is deterministic (engine + mirror_rate + source).
@@ -91,6 +92,7 @@ def put_cached_translation(
     mirror_rate: float,
     anchors: Optional[List] = None,
     embedding: Optional[List[float]] = None,
+    mirror_text: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Store translation and return the stored entry."""
     init_cache()
@@ -103,6 +105,7 @@ def put_cached_translation(
         "mirror_rate": float(mirror_rate),
         "anchors": anchors or [],
         "embedding": embedding,
+        "mirror_text": mirror_text or "",
         "created_at": datetime.utcnow().isoformat() + "Z",
     }
     _cache[_key(source, engine, mirror_rate)] = entry

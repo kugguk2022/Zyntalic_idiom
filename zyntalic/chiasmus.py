@@ -87,6 +87,9 @@ def generate_mirror_sigil(sentence_text):
     """
     Splits the sentence, compares the halves, and builds the Sigil.
     """
+    # Deterministic RNG tied to the input sentence for stable output across runs.
+    seed = int(hashlib.sha256((sentence_text or "").encode("utf-8")).hexdigest()[:8], 16)
+    rng = random.Random(seed)
     # 1. Split sentence into two halves (Thesis / Antithesis)
     words = re.findall(r'\w+', sentence_text)
     if not words: return ""
@@ -106,11 +109,11 @@ def generate_mirror_sigil(sentence_text):
     # 4. Determine Relationship (The Vowel)
     if context_A == context_B:
         # Pure Reflection / Continuation (Horizontal Vowel)
-        vowel = random.choice(VOWEL_HARMONY)
+        vowel = rng.choice(VOWEL_HARMONY)
         rel_type = "Reflection"
     else:
         # Irony / Conflict / Shift (Vertical Vowel)
-        vowel = random.choice(VOWEL_CONFLICT)
+        vowel = rng.choice(VOWEL_CONFLICT)
         rel_type = "Irony"
         
     # 5. Build the Sigil
