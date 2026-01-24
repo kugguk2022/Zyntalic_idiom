@@ -60,6 +60,13 @@ uvicorn apps.web.app:app --reload --port 8000
 
 ## Desktop/Web launcher
 
+### Quick Start (Windows)
+
+- Double-click or run: `run_desktop.bat`
+  - This sets `ZYNTALIC_MAX_TEXT_CHARS=100000000` and launches the desktop app.
+
+### Other launchers
+
 - Windows (cmd/PowerShell): `scripts\start_server.bat`
 - Bash/WSL: `chmod +x scripts/start_server.sh && scripts/start_server.sh`
 - Direct Python (any shell): `python -m scripts.run_desktop`
