@@ -14,6 +14,14 @@ This repo is intentionally lightweight: it runs with only NumPy, and upgrades au
 
 ## Install
 
+Fastest way of running the repo: 
+
+```
+run_desktop.bat
+```
+
+Typical way:
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
