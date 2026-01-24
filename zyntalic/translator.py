@@ -56,8 +56,11 @@ def mirror_readback(seed_text: str, anchors):
             anchors = core.anchor_weights_for_vec(vec, top_k=2)
         names = [name for name, _ in anchors] if anchors else core.ANCHORS[:2]
         weights = [w for _, w in anchors] if anchors else [0.5, 0.5]
-        rng = get_rng(f"mirror::{seed_text}")
-        return core.mirrored_sentence_anchored(rng, names, weights)
+        rng = get_rng(f"mirror-readback::{seed_text}")
+        A, B = core._choose_motif(rng, names, weights)  # type: ignore[attr-defined]
+        templates = getattr(core, "_EN_MIRROR_TEMPLATES", ["To {A} through {B}; to {B} through {A}."])
+        t = rng.choice(templates)
+        return t.format(A=A, B=B)
     except Exception:
         return None
 def _clean_lemma(text: str) -> str:
@@ -79,6 +82,7 @@ def translate_sentence(
     mirror_rate: float = 0.3,  # Lower value = more Zyntalic vocabulary
     engine: str = "core",
     W=None,
+    mirror_state: Optional[core.MirrorState] = None,
 ) -> Dict:
     """
     Translate a single sentence to a structured record.
@@ -98,7 +102,7 @@ def translate_sentence(
             # Run a quick validation test for the input
             test_suite = ZyntalicTestSuite()
             # Use core engine for actual translation but add test metadata
-            entry = core.generate_entry(lemma or src, mirror_rate=mirror_rate, W=W)
+            entry = core.generate_entry(lemma or src, mirror_rate=mirror_rate, W=W, mirror_state=mirror_state)
             row = {
                 "source": src,
                 "target": entry["sentence"],
@@ -160,7 +164,12 @@ def translate_sentence(
             # fall back to core
             engine = "core"
 
-    entry = core.generate_entry(lemma or src, mirror_rate=mirror_rate, W=W or _PROJECTION_W)
+    entry = core.generate_entry(
+        lemma or src,
+        mirror_rate=mirror_rate,
+        W=W or _PROJECTION_W,
+        mirror_state=mirror_state,
+    )
     # entry contains 'sentence' (with ctx tail) and anchor weights
     row = {
         "source": src,
@@ -190,7 +199,21 @@ def translate_text(
     if not text:
         return []
     parts = nlp.split_sentences(text)
-    return [translate_sentence(p, mirror_rate=mirror_rate, engine=engine, W=W) for p in parts if p.strip()]
+    mirror_state = core.MirrorState()
+    rows = []
+    for p in parts:
+        if not p.strip():
+            continue
+        rows.append(
+            translate_sentence(
+                p,
+                mirror_rate=mirror_rate,
+                engine=engine,
+                W=W,
+                mirror_state=mirror_state,
+            )
+        )
+    return rows
 
 
 def translate_batch(

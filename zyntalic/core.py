@@ -12,6 +12,8 @@ import json
 import math
 import os
 import random
+from collections import deque
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from .syntax import ParsedSentence, to_zyntalic_order
@@ -115,6 +117,9 @@ JONGSEONG = [
 # Polish-inspired Latin characters.
 POLISH_CONSONANTS = "bcćdźfghjklłmnńprsśtwzźż"
 POLISH_VOWELS = "aąeęioóuy"
+
+# Strict vocab mode avoids generated syllables and keeps outputs within known mappings.
+_STRICT_VOCAB = os.getenv("ZYNTALIC_STRICT_VOCAB", "1").lower() not in ("0", "false", "no", "off")
 
 # -------------------- Anchors --------------------
 ANCHORS = [
@@ -261,7 +266,7 @@ def _mix_lists(anchors, weights, field, base_list, k_sharpen=1.0):
     return pool, wts
 
 
-def _choose_motif(rng, anchors, weights):
+def _choose_motif(rng, anchors, weights, mirror_state: Optional[MirrorState] = None):
     """Deterministic motif selection."""
     lex = load_lexicons()
     motif_pool, motif_w = [], []
@@ -293,9 +298,29 @@ def _choose_motif(rng, anchors, weights):
     for pair in _DEFAULT_MOTIFS:
         motif_pool.append(pair)
         motif_w.append(0.2)
-    if motif_pool:
+    if not motif_pool:
+        return _DEFAULT_MOTIFS[int(rng.random() * len(_DEFAULT_MOTIFS))]
+
+    if mirror_state is None:
         return _weighted_sample(rng, motif_pool, motif_w)
-    return _DEFAULT_MOTIFS[int(rng.random() * len(_DEFAULT_MOTIFS))]
+
+    recent = set(mirror_state.recent_motifs)
+    filtered_pool = []
+    filtered_w = []
+    for pair, w in zip(motif_pool, motif_w):
+        key = mirror_state.motif_key(pair[0], pair[1])
+        if key in recent:
+            continue
+        filtered_pool.append(pair)
+        filtered_w.append(w)
+
+    if filtered_pool:
+        choice = _weighted_sample(rng, filtered_pool, filtered_w)
+    else:
+        choice = _weighted_sample(rng, motif_pool, motif_w)
+
+    mirror_state.recent_motifs.append(mirror_state.motif_key(choice[0], choice[1]))
+    return choice
 
 
 # -------------------- Helpers --------------------
@@ -383,8 +408,6 @@ def generate_word(seed_key: str) -> str:
 
 
 # -------------------- Sentence Templates --------------------
-_MIRROR_STYLE = os.getenv("ZYNTALIC_MIRROR_STYLE", "zyntalic").strip().lower()
-
 _EN_MIRROR_TEMPLATES = [
     "To {A} through {B}; to {B} through {A}.",
     "{A} begets {B}, and {B} reframes {A}.",
@@ -437,34 +460,87 @@ _DEFAULT_MOTIFS = [
 
 _MIRROR_TOKENS = None
 
+@dataclass
+class MirrorState:
+    motif_window: int = 12
+    template_window: int = 6
+    connector_window: int = 6
+    recent_motifs: deque = field(default_factory=lambda: deque(maxlen=12))
+    recent_templates: deque = field(default_factory=lambda: deque(maxlen=6))
+    recent_connectors: deque = field(default_factory=lambda: deque(maxlen=6))
+
+    def motif_key(self, a: str, b: str) -> Tuple[str, str]:
+        return tuple(sorted((a, b)))
+
 def _mirror_tokens() -> List[str]:
     global _MIRROR_TOKENS
     if _MIRROR_TOKENS is not None:
         return _MIRROR_TOKENS
-    seeds = [
-        "by", "through", "via", "path", "echo", "return", "fold", "turn", "bind", "mirror"
-    ]
-    _MIRROR_TOKENS = [generate_word(f"mirror::{s}") for s in seeds]
+    if _STRICT_VOCAB:
+        vocab = load_vocabulary_mappings()
+        verbs = list(vocab.get("verbs", {}).values())
+        if verbs:
+            rng = get_rng("mirror::tokens")
+            picks = []
+            seen = set()
+            for _ in range(min(12, len(verbs))):
+                tok = verbs[int(rng.random() * len(verbs))]
+                if tok in seen:
+                    continue
+                seen.add(tok)
+                picks.append(tok)
+            _MIRROR_TOKENS = picks or verbs[:8]
+        else:
+            _MIRROR_TOKENS = []
+    else:
+        seeds = [
+            "by", "through", "via", "path", "echo", "return", "fold", "turn", "bind", "mirror"
+        ]
+        _MIRROR_TOKENS = [generate_word(f"mirror::{s}") for s in seeds]
     return _MIRROR_TOKENS
 
 def _map_motif_word(word: str) -> str:
     vocab = load_vocabulary_mappings()
     key = (word or "").strip().lower()
     mapped = vocab.get("nouns", {}).get(key)
-    return mapped or generate_word(f"motif::{key}")
+    if mapped:
+        return mapped
+    if _STRICT_VOCAB:
+        nouns = list(vocab.get("nouns", {}).values())
+        if nouns:
+            rng = get_rng(f"motif::{key}")
+            return nouns[int(rng.random() * len(nouns))]
+    return generate_word(f"motif::{key}")
 
 
-def mirrored_sentence_anchored(rng, anchors, weights) -> str:
-    """Chiasmus style."""
-    A, B = _choose_motif(rng, anchors, weights)
-    if _MIRROR_STYLE == "english":
-        t = rng.choice(_EN_MIRROR_TEMPLATES)
-        return t.format(A=A, B=B)
+def mirrored_sentence_anchored(rng, anchors, weights, mirror_state: Optional[MirrorState] = None) -> str:
+    """Chiasmus style (Zyntalic mirror templates)."""
+    A, B = _choose_motif(rng, anchors, weights, mirror_state=mirror_state)
+
     # Zyntalic mirror rendering (keeps the chiasmus structure without English text)
     A_z = _map_motif_word(A)
     B_z = _map_motif_word(B)
-    connector = rng.choice(_mirror_tokens())
-    t = rng.choice(_ZY_MIRROR_TEMPLATES)
+
+    connectors = _mirror_tokens()
+    if connectors:
+        if mirror_state is None:
+            connector = rng.choice(connectors)
+        else:
+            recent = set(mirror_state.recent_connectors)
+            choices = [c for c in connectors if c not in recent] or connectors
+            connector = rng.choice(choices)
+            mirror_state.recent_connectors.append(connector)
+    else:
+        connector = _map_motif_word("mirror")
+
+    templates = _ZY_MIRROR_TEMPLATES
+    if mirror_state is None:
+        t = rng.choice(templates)
+    else:
+        avail = [i for i in range(len(templates)) if i not in mirror_state.recent_templates]
+        idx = rng.choice(avail) if avail else rng.randrange(len(templates))
+        mirror_state.recent_templates.append(idx)
+        t = templates[idx]
     return t.format(A=A_z, B=B_z, c=connector)
 
 
@@ -485,9 +561,27 @@ def plain_sentence_anchored(rng, anchors, weights) -> str:
     # Try to translate to Zyntalic
     vocab_mappings = load_vocabulary_mappings()
     
-    adj = vocab_mappings.get("adjectives", {}).get(adj_en, generate_word(f"adj::{adj_en}"))
-    noun = vocab_mappings.get("nouns", {}).get(noun_en, generate_word(f"noun::{noun_en}"))
-    verb = vocab_mappings.get("verbs", {}).get(verb_en, generate_word(f"verb::{verb_en}"))
+    adj = vocab_mappings.get("adjectives", {}).get(adj_en)
+    noun = vocab_mappings.get("nouns", {}).get(noun_en)
+    verb = vocab_mappings.get("verbs", {}).get(verb_en)
+
+    if _STRICT_VOCAB:
+        adj_pool = list(vocab_mappings.get("adjectives", {}).values())
+        noun_pool = list(vocab_mappings.get("nouns", {}).values())
+        verb_pool = list(vocab_mappings.get("verbs", {}).values())
+        if not adj and adj_pool:
+            adj = adj_pool[int(rng.random() * len(adj_pool))]
+        if not noun and noun_pool:
+            noun = noun_pool[int(rng.random() * len(noun_pool))]
+        if not verb and verb_pool:
+            verb = verb_pool[int(rng.random() * len(verb_pool))]
+
+    if not adj:
+        adj = generate_word(f"adj::{adj_en}")
+    if not noun:
+        noun = generate_word(f"noun::{noun_en}")
+    if not verb:
+        verb = generate_word(f"verb::{verb_en}")
 
     return f"{adj} {noun} {verb}"
 
@@ -598,7 +692,7 @@ def generate_embedding(seed_key: str, dim: int = 300, W=None):
 
 
 # -------------------- Public API --------------------
-def generate_entry(seed_word: str, mirror_rate: float = 0.3, W=None) -> Dict:
+def generate_entry(seed_word: str, mirror_rate: float = 0.3, W=None, mirror_state: Optional[MirrorState] = None) -> Dict:
     """
     Generate a full dictionary entry deterministically.
     seed_word: The English input (e.g., 'Love') which seeds ALL randomness.
@@ -618,7 +712,7 @@ def generate_entry(seed_word: str, mirror_rate: float = 0.3, W=None) -> Dict:
 
     # 3. Sentence
     if rng.random() < mirror_rate:
-        sent_core = mirrored_sentence_anchored(rng, chosen, weights)
+        sent_core = mirrored_sentence_anchored(rng, chosen, weights, mirror_state=mirror_state)
     else:
         sent_core = plain_sentence_anchored(rng, chosen, weights)
 

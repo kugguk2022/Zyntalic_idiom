@@ -77,11 +77,6 @@ The `mirror_rate` controls the balance between:
 - **High (0.7-1.0)**: More Zyntalic chiasmus templates (mirror structure without English)
   - Example pattern: `<A> <zy-connector> <B> · <B> <zy-connector> <A>`
 
-If you prefer the legacy English mirror templates, set:
-```bash
-export ZYNTALIC_MIRROR_STYLE=english
-```
-
 **Recommended**: `0.3` for authentic Zyntalic output
 
 ## Output Format
