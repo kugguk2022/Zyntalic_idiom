@@ -38,10 +38,39 @@ def _ensure_dirs() -> None:
         os.makedirs(CACHE_DIR, exist_ok=True)
 
 
-def _key(source: str, engine: str, mirror_rate: float) -> str:
-    # Normalize source for stable key
-    normalized = (source or "").strip()
-    payload = f"{engine}|{mirror_rate:.4f}|{normalized}"
+def _normalize_options(options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    if not options:
+        return {}
+    normalized: Dict[str, Any] = {}
+    for key, value in options.items():
+        if value is None:
+            continue
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                continue
+        normalized[key] = value
+    return normalized
+
+
+def _key(
+    source: str,
+    engine: str,
+    mirror_rate: float,
+    options: Optional[Dict[str, Any]] = None,
+) -> str:
+    normalized_source = (source or "").strip()
+    payload = json.dumps(
+        {
+            "engine": engine,
+            "mirror_rate": round(float(mirror_rate), 4),
+            "source": normalized_source,
+            "options": _normalize_options(options),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     digest = hashlib.blake2s(payload.encode("utf-8"), digest_size=12).hexdigest()
     return digest
 
@@ -75,9 +104,14 @@ def save_cache() -> None:
         pass
 
 
-def get_cached_translation(source: str, engine: str, mirror_rate: float) -> Optional[Dict[str, Any]]:
+def get_cached_translation(
+    source: str,
+    engine: str,
+    mirror_rate: float,
+    options: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
     init_cache()
-    k = _key(source, engine, mirror_rate)
+    k = _key(source, engine, mirror_rate, options=options)
     entry = _cache.get(k)
     if not entry:
         return None
@@ -93,6 +127,8 @@ def put_cached_translation(
     anchors: Optional[List] = None,
     embedding: Optional[List[float]] = None,
     mirror_text: Optional[str] = None,
+    sidecar: Optional[Dict[str, Any]] = None,
+    options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Store translation and return the stored entry."""
     init_cache()
@@ -106,9 +142,11 @@ def put_cached_translation(
         "anchors": anchors or [],
         "embedding": embedding,
         "mirror_text": mirror_text or "",
+        "sidecar": sidecar or {},
+        "options": _normalize_options(options),
         "created_at": datetime.utcnow().isoformat() + "Z",
     }
-    _cache[_key(source, engine, mirror_rate)] = entry
+    _cache[_key(source, engine, mirror_rate, options=options)] = entry
     save_cache()
     return dict(entry)
 

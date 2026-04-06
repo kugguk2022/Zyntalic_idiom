@@ -1,8 +1,10 @@
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { TranslationEngine, TranslationConfig, TranslationResult } from './types';
 import { performTranslation } from './services/apiService';
 import SettingsBar from './components/SettingsBar';
+import SigilColumn from './components/SigilColumn';
+import AnchorBars from './components/AnchorBars';
 
 const App: React.FC = () => {
   const [inputText, setInputText] = useState('');
@@ -19,7 +21,12 @@ const App: React.FC = () => {
     engine: TranslationEngine.SEMANTIC,
     mirror: 0.3,  // Lower value shows more Zyntalic vocabulary
     sourceLang: 'Auto-detect',
-    targetLang: 'Zyntalic'
+    targetLang: 'Zyntalic',
+    evidentiality: 'direct',
+    register: 'formal',
+    dialect: 'standard',
+    frameA: '',
+    frameB: '',
   });
 
   const latencyMs = outputResult?.latency ?? null;
@@ -302,8 +309,34 @@ const App: React.FC = () => {
                     <span className="text-sm font-medium tracking-wide">Syncing Neural Context...</span>
                   </div>
                 ) : outputResult ? (
-                  <div className="text-slate-200 animate-fade-in-up">
-                    {outputResult.text}
+                  <div className="text-slate-200 animate-fade-in-up space-y-4">
+                    {(outputResult.rows.length > 0
+                      ? outputResult.rows
+                      : [{ text: outputResult.text, sidecar: outputResult.sidecar }]
+                    ).map((row, index) => (
+                      <div
+                        key={`${index}-${row.text.slice(0, 24)}`}
+                        className="rounded-2xl border border-slate-800/70 bg-slate-950/40 p-4"
+                      >
+                        <div className="flex gap-4">
+                          <SigilColumn
+                            sigil={row.sidecar?.sigil ?? null}
+                            type={row.sidecar?.sigil_type ?? null}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="whitespace-pre-wrap">
+                              {row.text}
+                            </div>
+                            {row.sidecar?.evidentiality && (
+                              <div className="mt-3 text-[10px] uppercase tracking-[0.22em] text-slate-500">
+                                Evidentiality: {row.sidecar.evidentiality}
+                              </div>
+                            )}
+                            <AnchorBars weights={row.sidecar?.anchor_weights ?? []} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <span className="text-slate-700 italic transition-opacity duration-500">Waiting for translation output...</span>

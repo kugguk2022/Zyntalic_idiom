@@ -95,7 +95,29 @@ class TranslateRequest(BaseModel):
     text: str
     mirror_rate: float = 0.3  # Lower value = more Zyntalic vocabulary, higher = more English templates
     engine: str = "core"  # "core"|"chiasmus"|"transformer"|"test_suite"
+    evidentiality: str = "direct"
+    register: str = "formal"
+    dialect: str = "standard"
+    frame_a: str = ""
+    frame_b: str = ""
     zyntalic_only: bool = False
+
+
+def _request_payload(req: TranslateRequest) -> dict:
+    if hasattr(req, "model_dump"):
+        return req.model_dump()
+    return req.dict()
+
+
+def _translation_options(req: TranslateRequest) -> dict:
+    payload = _request_payload(req)
+    return {
+        "evidentiality": payload.get("evidentiality", "direct"),
+        "register": payload.get("register", "formal"),
+        "dialect": payload.get("dialect", "standard"),
+        "frame_a": payload.get("frame_a", ""),
+        "frame_b": payload.get("frame_b", ""),
+    }
 
 
 @app.get("/")
@@ -303,6 +325,7 @@ def health():
 def translate(req: TranslateRequest):
     try:
         text = (req.text or "").strip()
+        translation_options = _translation_options(req)
         if not text:
             raise HTTPException(status_code=400, detail="Text is required.")
         if len(text) > MAX_TEXT_CHARS:
@@ -316,7 +339,15 @@ def translate(req: TranslateRequest):
         
         cached = None
         if USE_CACHE:
-            cached = get_cached_translation(text, req.engine, req.mirror_rate)
+            cached = get_cached_translation(
+                text,
+                req.engine,
+                req.mirror_rate,
+                options=translation_options,
+            )
+        if cached:
+            if not cached.get("sidecar"):
+                cached = None
         if cached:
             logger.info("Translate cache hit")
             if req.mirror_rate > 0.75 and not cached.get("mirror_text"):
@@ -330,6 +361,7 @@ def translate(req: TranslateRequest):
                         {
                             "target": cached.get("target", ""),
                             "mirror_text": cached.get("mirror_text", ""),
+                            "sidecar": cached.get("sidecar", {}),
                         }
                     ],
                     "cached": True,
@@ -337,15 +369,12 @@ def translate(req: TranslateRequest):
             return {"rows": [cached], "cached": True}
 
         logger.info("Generating translation (cache %s)", "enabled" if USE_CACHE else "disabled")
-        rows = translate_text(text, mirror_rate=req.mirror_rate, engine=req.engine)
-        if req.zyntalic_only:
-            rows = [
-                {
-                    "target": row.get("target", ""),
-                    "mirror_text": row.get("mirror_text", ""),
-                }
-                for row in rows
-            ]
+        rows = translate_text(
+            text,
+            mirror_rate=req.mirror_rate,
+            engine=req.engine,
+            config=translation_options,
+        )
         logger.info("Generated %s translation rows", len(rows))
 
         stored_rows = []
@@ -360,10 +389,24 @@ def translate(req: TranslateRequest):
                     anchors=row.get("anchors", []),
                     embedding=row.get("embedding") if isinstance(row, dict) else None,
                     mirror_text=row.get("mirror_text") if isinstance(row, dict) else None,
+                    sidecar=row.get("sidecar") if isinstance(row, dict) else None,
+                    options=translation_options,
                 ) if USE_CACHE else row
             )
 
         logger.info("Translate success: returning %s rows", len(stored_rows))
+        if req.zyntalic_only:
+            return {
+                "rows": [
+                    {
+                        "target": row.get("target", ""),
+                        "mirror_text": row.get("mirror_text", ""),
+                        "sidecar": row.get("sidecar", {}),
+                    }
+                    for row in stored_rows
+                ],
+                "cached": False,
+            }
         return {"rows": stored_rows, "cached": False}
         
     except Exception as exc:

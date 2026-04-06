@@ -16,6 +16,8 @@ from typing import Dict, List, Optional
 
 from . import core
 from . import nlp
+from .chiasmus import generate_mirror_sigil
+from .ir import Frame, PivotType, SentenceSidecar
 from .utils.rng import get_rng
 
 # Memoize projection to avoid repeated disk reads during translation hot path
@@ -72,6 +74,112 @@ def mirror_readback(seed_text: str, anchors, mirror_terms: Optional[List[Dict[st
         return t.format(A=A, B=B)
     except Exception:
         return None
+
+
+def _requested_frame_names(config: Optional[Dict]) -> List[str]:
+    if not config:
+        return []
+    names: List[str] = []
+    for key in ("frame_a", "frame_b"):
+        value = (config.get(key) or "").strip()
+        if value:
+            names.append(value)
+    return names
+
+
+def _coerce_anchor_pairs(raw) -> List[tuple[str, float]]:
+    pairs: List[tuple[str, float]] = []
+    for item in raw or []:
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            name, weight = item[0], item[1]
+        elif isinstance(item, dict):
+            name = item.get("name") or item.get("anchor")
+            weight = item.get("weight")
+        else:
+            continue
+        if not name:
+            continue
+        try:
+            pairs.append((str(name), float(weight)))
+        except Exception:
+            continue
+    return pairs
+
+
+def _collect_anchor_weights(source: str, row: Dict, config: Optional[Dict]) -> List[tuple[str, float]]:
+    frame_names = _requested_frame_names(config)
+    lookup_k = len(core.ANCHORS) if frame_names else 5
+    weights: List[tuple[str, float]] = []
+
+    embedding = row.get("embedding")
+    if embedding is not None:
+        try:
+            weights = core.anchor_weights_for_vec(embedding, top_k=lookup_k)
+        except Exception:
+            weights = []
+
+    if not weights:
+        weights = _coerce_anchor_pairs(row.get("anchors"))
+
+    needs_full_lookup = bool(frame_names) and any(
+        frame_name not in {name for name, _ in weights}
+        for frame_name in frame_names
+    )
+    if needs_full_lookup or not weights:
+        try:
+            base_vec = embedding if embedding is not None else core.base_embedding(source or "", dim=300)
+            weights = core.anchor_weights_for_vec(base_vec, top_k=lookup_k)
+        except Exception:
+            weights = weights or []
+
+    return weights[:lookup_k]
+
+
+def _extract_sigil(text: str) -> tuple[Optional[str], Optional[str]]:
+    try:
+        sigil_data = generate_mirror_sigil(text)
+    except Exception:
+        return None, None
+
+    if isinstance(sigil_data, tuple) and len(sigil_data) == 2:
+        sigil, sigil_type = sigil_data
+        return (sigil or None), (sigil_type or None)
+    if isinstance(sigil_data, str):
+        return (sigil_data or None), None
+    return None, None
+
+
+def build_sentence_sidecar(source: str, row: Dict, config: Optional[Dict] = None) -> SentenceSidecar:
+    anchor_weights = _collect_anchor_weights(source, row, config)
+    weight_map = {name: weight for name, weight in anchor_weights}
+    frames: List[Frame] = []
+    for frame_id, key in (("A", "frame_a"), ("B", "frame_b")):
+        anchor = (config or {}).get(key, "")
+        anchor = anchor.strip() if isinstance(anchor, str) else ""
+        if not anchor:
+            continue
+        frames.append(Frame(id=frame_id, anchor=anchor, weight=weight_map.get(anchor, 0.0)))
+
+    sigil, sigil_type = _extract_sigil(source)
+    evidentiality = (config or {}).get("evidentiality")
+    evidentiality = evidentiality.strip() if isinstance(evidentiality, str) else None
+
+    return SentenceSidecar(
+        frames=frames,
+        pivot=PivotType.NEUTRAL,
+        anchor_weights=anchor_weights[:5],
+        sigil=sigil,
+        sigil_type=sigil_type,
+        evidentiality=evidentiality or None,
+        tokens=None,
+    )
+
+
+def _attach_sidecar(row: Dict, source: str, config: Optional[Dict]) -> Dict:
+    row["sidecar"] = build_sentence_sidecar(source, row, config).to_dict()
+    return row
+
+
 def _clean_lemma(text: str) -> str:
     # Prefer NLP backend lemma if available; fallback to regex normalization.
     t = (text or "").strip()
@@ -179,6 +287,7 @@ def translate_sentence(
     engine: str = "core",
     W=None,
     mirror_state: Optional[core.MirrorState] = None,
+    config: Optional[Dict] = None,
 ) -> Dict:
     """
     Translate a single sentence to a structured record.
@@ -218,7 +327,7 @@ def translate_sentence(
             }
             if mirror_rate > 0.75:
                 row["mirror_text"] = mirror_readback(lemma or src, entry.get("anchors", []), mirror_terms=mirror_terms)
-            return row
+            return _attach_sidecar(row, src, config)
         except Exception as e:
             # Fall back to core if test suite fails
             engine = "core"
@@ -229,7 +338,7 @@ def translate_sentence(
             row = reverse_translate_sentence(src)
             if mirror_rate > 0.75:
                 row["mirror_text"] = mirror_readback(src, row.get("anchors", []), mirror_terms=mirror_terms)
-            return row
+            return _attach_sidecar(row, src, config)
         except Exception:
             engine = "core"
 
@@ -245,7 +354,7 @@ def translate_sentence(
             }
             if mirror_rate > 0.75:
                 row["mirror_text"] = mirror_readback(src, row.get("anchors", []), mirror_terms=mirror_terms)
-            return row
+            return _attach_sidecar(row, src, config)
         except Exception as e:
             # print(f"Transformer error: {e}") # debug
             engine = "core"
@@ -263,7 +372,7 @@ def translate_sentence(
             }
             if mirror_rate > 0.75:
                 row["mirror_text"] = mirror_readback(src, row.get("anchors", []), mirror_terms=mirror_terms)
-            return row
+            return _attach_sidecar(row, src, config)
         except Exception:
             # fall back to core
             engine = "core"
@@ -286,7 +395,7 @@ def translate_sentence(
     }
     if mirror_rate > 0.75:
         row["mirror_text"] = mirror_readback(lemma or src, entry.get("anchors", []), mirror_terms=mirror_terms)
-    return row
+    return _attach_sidecar(row, src, config)
 
 
 def translate_text(
@@ -295,6 +404,7 @@ def translate_text(
     mirror_rate: float = 0.8,
     engine: str = "core",
     W=None,
+    config: Optional[Dict] = None,
 ) -> List[Dict]:
     """
     Translate multi-sentence text into a list of records.
@@ -319,6 +429,7 @@ def translate_text(
                 engine=engine,
                 W=W,
                 mirror_state=mirror_state,
+                config=config,
             )
         )
     return rows
@@ -331,6 +442,7 @@ def translate_batch(
     engine: str = "core",
     W=None,
     flatten: bool = False,
+    config: Optional[Dict] = None,
 ) -> List:
     """Translate a batch of texts efficiently.
 
@@ -339,7 +451,7 @@ def translate_batch(
     _ensure_warm()
     results: List[List[Dict]] = []
     for text in texts:
-        rows = translate_text(text, mirror_rate=mirror_rate, engine=engine, W=W)
+        rows = translate_text(text, mirror_rate=mirror_rate, engine=engine, W=W, config=config)
         results.append(rows)
 
     if flatten:

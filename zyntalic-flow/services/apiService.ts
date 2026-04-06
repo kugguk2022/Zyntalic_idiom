@@ -34,6 +34,11 @@ export const performTranslation = async (
             text: text,
             mirror_rate: config.mirror,
             engine: engine,
+            evidentiality: config.evidentiality,
+            register: config.register,
+            dialect: config.dialect,
+            frame_a: config.frameA,
+            frame_b: config.frameB,
             zyntalic_only: true,
         }),
     });
@@ -48,13 +53,17 @@ export const performTranslation = async (
     // Backend returns { rows: [{ source, target, lemma, anchors, engine }] }
     // We only display the Zyntalic output in the target pane.
     // If rows is missing or empty, handle gracefully.
-    const rows = data.rows || [];
-    
+    const rows = (data.rows || []).map((row: any) => ({
+      text: row.target || "???",
+      mirrorText: row.mirror_text || undefined,
+      sidecar: row.sidecar || undefined,
+    }));
+
     const translatedText = rows
-      .map((r: any) => r.target || "???")
+      .map((row) => row.text)
       .join("\n\n");
     const mirrorText = rows
-      .map((r: any) => r.mirror_text)
+      .map((row) => row.mirrorText)
       .filter((t: string) => t && t.trim().length > 0)
       .join("\n\n");
 
@@ -63,7 +72,9 @@ export const performTranslation = async (
       latency: endTime - startTime,
       confidence: 1.0, // Backend doesn't give confidence yet
       detectedSentiment: "English", // Placeholder
-      mirrorText: mirrorText || undefined
+      mirrorText: mirrorText || undefined,
+      sidecar: rows[0]?.sidecar,
+      rows,
     };
   } catch (error) {
     console.error("Translation Error:", error);
