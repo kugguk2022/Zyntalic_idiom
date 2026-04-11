@@ -273,6 +273,58 @@ def _compose_target(surface: str, ctx_tail: Optional[str]) -> str:
     return f"{surface} {ctx_tail}"
 
 
+def _minimal_context_tail(seed_text: str) -> str:
+    seed = (seed_text or "ctx").strip() or "ctx"
+    return f"⟦ctx:han={core.make_korean_tail(seed)}⟧"
+
+
+def _enforce_target_rules(target: str, source: str, engine: str) -> str:
+    """Apply canonical output rules before rows are returned.
+
+    Rules enforced:
+    1) For non-reverse engines, a context tail must exist.
+    2) Context tail is kept at the very end of the target string.
+    3) Surface text is whitespace-normalized.
+    """
+    raw_target = (target or "").strip()
+    if not raw_target:
+        if engine == "reverse":
+            return raw_target
+        return _compose_target((source or "").strip(), _minimal_context_tail(source or "ctx"))
+
+    surface, ctx_tail = _split_context_tail(raw_target)
+    surface = re.sub(r"\s+", " ", surface).strip()
+
+    if ctx_tail:
+        # Keep only the first context block and normalize malformed tails.
+        if "⟧" in ctx_tail:
+            ctx_tail = ctx_tail[: ctx_tail.index("⟧") + 1]
+        if not (ctx_tail.startswith("⟦ctx:") and ctx_tail.endswith("⟧")):
+            ctx_tail = _minimal_context_tail(source or surface)
+
+    if engine != "reverse" and not ctx_tail:
+        ctx_tail = _minimal_context_tail(source or surface)
+
+    return _compose_target(surface, ctx_tail)
+
+
+def _validate_target_rules(target: str, engine: str) -> List[str]:
+    """Return non-fatal rule warnings for observability/debugging."""
+    warnings: List[str] = []
+    normalized = (target or "").strip()
+    ctx_count = normalized.count("⟦ctx:")
+
+    if engine != "reverse":
+        if ctx_count == 0:
+            warnings.append("missing_context_tail")
+        if not normalized.endswith("⟧"):
+            warnings.append("context_not_final")
+
+    if ctx_count > 1:
+        warnings.append("multiple_context_tails")
+    return warnings
+
+
 def _apply_register_surface(surface: str, register: str) -> str:
     surface = (surface or "").strip()
     if not surface or register == "formal":
@@ -370,12 +422,17 @@ def build_sentence_sidecar(source: str, row: Dict, config: Optional[Dict] = None
 
 
 def _attach_sidecar(row: Dict, source: str, config: Optional[Dict]) -> Dict:
-    row["target"] = _apply_requested_scope(
+    engine = str(row.get("engine") or "")
+    scoped_target = _apply_requested_scope(
         row.get("target", ""),
         source,
         config,
-        str(row.get("engine") or ""),
+        engine,
     )
+    row["target"] = _enforce_target_rules(scoped_target, source, engine)
+    warnings = _validate_target_rules(row["target"], engine)
+    if warnings:
+        row["rule_warnings"] = warnings
     row["sidecar"] = build_sentence_sidecar(source, row, config).to_dict()
     return row
 

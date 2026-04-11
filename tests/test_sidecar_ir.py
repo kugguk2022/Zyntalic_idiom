@@ -64,3 +64,15 @@ def test_translate_text_scope_controls_change_target(monkeypatch):
     assert "dialect=northern" in scoped["target"]
     assert scoped["sidecar"]["register"] == "literary"
     assert scoped["sidecar"]["dialect"] == "northern"
+
+
+def test_rule1_enforces_context_tail_for_non_reverse_engine():
+    target = translator._enforce_target_rules("surface only", "seed text", "core")
+    assert "⟦ctx:" in target
+    assert target.endswith("⟧")
+
+
+def test_rule1_validation_flags_multiple_context_tails():
+    bad = "alpha ⟦ctx:han=가나⟧ beta ⟦ctx:han=다라⟧"
+    warnings = translator._validate_target_rules(bad, "core")
+    assert "multiple_context_tails" in warnings
