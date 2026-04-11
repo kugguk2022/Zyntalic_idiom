@@ -105,3 +105,54 @@ The test scripts verify everything works:
 3. `check_status.py` - Full system diagnostic
 
 All tests passed when server is running!
+
+## 🚧 To Implement (LLM-Ready Language Quality)
+
+Priority objective: make Zyntalic generation robust and high quality without depending on Gemini.
+
+### P0 - Core quality and determinism
+
+1. **Strengthen rule engine fidelity**
+   - Formalize and enforce grammar rules (S-O-V-C ordering, role markers, morphology constraints) in one canonical pipeline.
+   - Add rule validation pass before final surface rendering.
+
+2. **Deterministic quality gates**
+   - Add regression tests that fail when output violates script ratios, grammar constraints, or context-tail format.
+   - Add golden-set snapshots for 200-500 benchmark prompts.
+
+3. **Generator upgrade (non-Gemini fallback first)**
+   - Refactor generator to use rule-guided token/word assembly with explicit morphology/syntax checks.
+   - Keep current deterministic path as baseline; avoid introducing stochastic drift.
+
+### P1 - Embeddings and semantic grounding
+
+4. **Embedding backend hardening**
+   - Improve hash-only fallback quality with better lexical similarity heuristics (lemma/stem/token features + anchor priors), not just random-like hash vectors.
+   - Add consistent dimensionality/version tagging to embedding caches.
+
+5. **Anchor relevance calibration**
+   - Re-score anchor weights with sentence-level plus token-level blending.
+   - Add eval metrics for anchor stability across paraphrases.
+
+6. **Vocabulary/lexicon expansion quality**
+   - Expand coverage for common verbs, function words, and domain vocabulary.
+   - Add quality checks to prevent malformed mixed-script outputs.
+
+### P2 - Optional Gemini integration (assistive, not required)
+
+7. **Gemini as optional enhancer only**
+   - Keep Gemini path feature-flagged and non-blocking.
+   - Ensure all primary translation tests pass with Gemini disabled.
+
+8. **Dual-path evaluation**
+   - Compare deterministic-only vs Gemini-assisted outputs on the same benchmark set.
+   - Track gains in semantic coherence without sacrificing deterministic reproducibility.
+
+### P3 - LLM-focused evaluation suite
+
+9. **LLM readiness benchmark**
+   - Create an evaluation set for instruction-following, consistency, reversibility hints, and long-context stability.
+   - Add CI checks for drift in morphology, syntax, and anchor semantics.
+
+10. **Implementation target**
+   - Deliver a stable synthetic language engine that is rule-first, deterministic, and usable as an LLM-facing representation layer with minimal external model dependence.
