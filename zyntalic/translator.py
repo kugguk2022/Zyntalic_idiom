@@ -10,6 +10,8 @@ This wraps the deterministic core into a stable interface usable by:
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 from typing import Dict, List, Optional
@@ -23,6 +25,27 @@ from .utils.rng import get_rng
 # Memoize projection to avoid repeated disk reads during translation hot path
 _PROJECTION_W = core.get_projection()
 _WARMED = False
+_SCOPE_DEFAULTS = {
+    "evidentiality": "direct",
+    "register": "formal",
+    "dialect": "standard",
+    "frame_a": "",
+    "frame_b": "",
+}
+_SCOPE_REGISTERS = {"formal", "informal", "literary", "archaic", "technical"}
+_SCOPE_DIALECTS = {"standard", "northern", "southern", "coastal", "mountain"}
+_DIALECT_REPLACEMENTS = {
+    "northern": (("a", "ə"), ("o", "ʊ"), ("k", "x"), ("p", "f")),
+    "southern": (("i", "e"), ("u", "o"), ("t", "d"), ("k", "g")),
+    "coastal": (("l", "r"),),
+    "mountain": (("s", "sh"), ("r", "rh")),
+}
+_DIALECT_FALLBACK_MARKERS = {
+    "northern": "북",
+    "southern": "남",
+    "coastal": "해",
+    "mountain": "산",
+}
 
 
 def _ensure_warm() -> None:
@@ -76,12 +99,35 @@ def mirror_readback(seed_text: str, anchors, mirror_terms: Optional[List[Dict[st
         return None
 
 
-def _requested_frame_names(config: Optional[Dict]) -> List[str]:
+def _normalize_scope_config(config: Optional[Dict]) -> Dict[str, str]:
+    normalized = dict(_SCOPE_DEFAULTS)
     if not config:
-        return []
+        return normalized
+
+    for key, default in _SCOPE_DEFAULTS.items():
+        value = config.get(key, default)
+        if isinstance(value, str):
+            value = value.strip()
+        if value in (None, ""):
+            normalized[key] = default
+            continue
+        normalized[key] = str(value)
+
+    register = normalized["register"].lower()
+    normalized["register"] = register if register in _SCOPE_REGISTERS else _SCOPE_DEFAULTS["register"]
+
+    dialect = normalized["dialect"].lower()
+    normalized["dialect"] = dialect if dialect in _SCOPE_DIALECTS else _SCOPE_DEFAULTS["dialect"]
+
+    normalized["evidentiality"] = normalized["evidentiality"].lower()
+    return normalized
+
+
+def _requested_frame_names(config: Optional[Dict]) -> List[str]:
+    normalized = _normalize_scope_config(config)
     names: List[str] = []
     for key in ("frame_a", "frame_b"):
-        value = (config.get(key) or "").strip()
+        value = normalized.get(key, "").strip()
         if value:
             names.append(value)
     return names
@@ -149,12 +195,157 @@ def _extract_sigil(text: str) -> tuple[Optional[str], Optional[str]]:
     return None, None
 
 
+def _scope_signature(config: Optional[Dict], anchor_weights: List[tuple[str, float]]) -> str:
+    normalized = _normalize_scope_config(config)
+    anchor_blob = "-".join(
+        name.split("_", 1)[-1].replace("_", "")[:4].upper()
+        for name, _ in anchor_weights[:2]
+    ) or "PLAIN"
+    payload = json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.blake2s(payload.encode("utf-8"), digest_size=3).hexdigest().upper()
+    return f"{anchor_blob}-{digest}"
+
+
+def _resolve_pivot(frames: List[Frame]) -> PivotType:
+    if len(frames) >= 2:
+        delta = abs(frames[0].weight - frames[1].weight)
+        return PivotType.CONVERGE if delta <= 0.08 else PivotType.DIVERGE
+    if len(frames) == 1 and frames[0].weight > 0:
+        return PivotType.CONVERGE
+    return PivotType.NEUTRAL
+
+
+def _token_sidecar(source: str) -> Optional[List[Dict[str, object]]]:
+    tokens = []
+    for token in nlp.analyze_tokens(source):
+        surface = (token.get("text") or "").strip()
+        if not surface:
+            continue
+        tokens.append(
+            {
+                "surface": surface,
+                "lemma": (token.get("lemma") or surface).lower(),
+                "pos": token.get("pos") or "X",
+                "morphemes": {},
+            }
+        )
+    return tokens or None
+
+
+def _split_context_tail(text: str) -> tuple[str, Optional[str]]:
+    if not text:
+        return "", None
+    marker = "⟦ctx:"
+    if marker not in text:
+        return text.strip(), None
+    head, _, tail = text.partition(marker)
+    return head.rstrip(), f"{marker}{tail.strip()}"
+
+
+def _merge_context_tail(ctx_tail: Optional[str], updates: Dict[str, str]) -> Optional[str]:
+    if not updates and not ctx_tail:
+        return None
+
+    parts: List[str] = []
+    if ctx_tail and ctx_tail.startswith("⟦ctx:") and ctx_tail.endswith("⟧"):
+        inner = ctx_tail[len("⟦ctx:"):-1].strip()
+        parts = [item.strip() for item in inner.split(";") if item.strip()]
+
+    present = {
+        item.split("=", 1)[0].strip()
+        for item in parts
+        if "=" in item
+    }
+    for key, value in updates.items():
+        if key in present:
+            continue
+        parts.append(f"{key}={value}")
+
+    return f"⟦ctx:{'; '.join(parts)}⟧" if parts else None
+
+
+def _compose_target(surface: str, ctx_tail: Optional[str]) -> str:
+    surface = (surface or "").strip()
+    if not ctx_tail:
+        return surface
+    if not surface:
+        return ctx_tail
+    return f"{surface} {ctx_tail}"
+
+
+def _apply_register_surface(surface: str, register: str) -> str:
+    surface = (surface or "").strip()
+    if not surface or register == "formal":
+        return surface
+    if register == "informal" and not surface.endswith(("야", "어", "아", "지")):
+        return f"{surface} 야"
+    if register == "literary" and "통하여" not in surface:
+        return f"{surface} 통하여"
+    if register == "archaic" and "하옵니다" not in surface:
+        return f"{surface} 하옵니다"
+    if register == "technical" and "::정의" not in surface:
+        return f"{surface} ::정의"
+    return surface
+
+
+def _apply_dialect_surface(surface: str, dialect: str) -> str:
+    surface = (surface or "").strip()
+    if not surface or dialect == "standard":
+        return surface
+
+    modified = surface
+    for old, new in _DIALECT_REPLACEMENTS.get(dialect, ()):
+        modified = modified.replace(old, new)
+
+    if modified == surface:
+        marker = _DIALECT_FALLBACK_MARKERS.get(dialect)
+        if marker and not modified.endswith(marker):
+            modified = f"{modified} {marker}"
+    return modified
+
+
+def _context_scope_updates(config: Optional[Dict]) -> Dict[str, str]:
+    normalized = _normalize_scope_config(config)
+    updates: Dict[str, str] = {}
+    if normalized["evidentiality"] != _SCOPE_DEFAULTS["evidentiality"]:
+        updates["evidentiality"] = normalized["evidentiality"]
+    if normalized["register"] != _SCOPE_DEFAULTS["register"]:
+        updates["register"] = normalized["register"]
+    if normalized["dialect"] != _SCOPE_DEFAULTS["dialect"]:
+        updates["dialect"] = normalized["dialect"]
+
+    frames = []
+    if normalized["frame_a"]:
+        frames.append(f"A:{normalized['frame_a']}")
+    if normalized["frame_b"]:
+        frames.append(f"B:{normalized['frame_b']}")
+    if frames:
+        updates["frames"] = "|".join(frames)
+    return updates
+
+
+def _apply_requested_scope(target: str, source: str, config: Optional[Dict], engine: str) -> str:
+    if not target or engine == "reverse":
+        return target
+
+    normalized = _normalize_scope_config(config)
+    surface, ctx_tail = _split_context_tail(target)
+    if normalized["register"] != _SCOPE_DEFAULTS["register"]:
+        surface = _apply_register_surface(surface, normalized["register"])
+    if normalized["dialect"] != _SCOPE_DEFAULTS["dialect"]:
+        surface = _apply_dialect_surface(surface, normalized["dialect"])
+
+    ctx_tail = _merge_context_tail(ctx_tail, _context_scope_updates(normalized))
+    return _compose_target(surface, ctx_tail)
+
+
 def build_sentence_sidecar(source: str, row: Dict, config: Optional[Dict] = None) -> SentenceSidecar:
     anchor_weights = _collect_anchor_weights(source, row, config)
     weight_map = {name: weight for name, weight in anchor_weights}
+    normalized = _normalize_scope_config(config)
     frames: List[Frame] = []
     for frame_id, key in (("A", "frame_a"), ("B", "frame_b")):
-        anchor = (config or {}).get(key, "")
+        anchor = normalized.get(key, "")
         anchor = anchor.strip() if isinstance(anchor, str) else ""
         if not anchor:
             continue
@@ -166,16 +357,25 @@ def build_sentence_sidecar(source: str, row: Dict, config: Optional[Dict] = None
 
     return SentenceSidecar(
         frames=frames,
-        pivot=PivotType.NEUTRAL,
+        pivot=_resolve_pivot(frames),
         anchor_weights=anchor_weights[:5],
         sigil=sigil,
         sigil_type=sigil_type,
         evidentiality=evidentiality or None,
-        tokens=None,
+        register=normalized["register"] or None,
+        dialect=normalized["dialect"] or None,
+        scope_signature=_scope_signature(normalized, anchor_weights[:5]),
+        tokens=_token_sidecar(source),
     )
 
 
 def _attach_sidecar(row: Dict, source: str, config: Optional[Dict]) -> Dict:
+    row["target"] = _apply_requested_scope(
+        row.get("target", ""),
+        source,
+        config,
+        str(row.get("engine") or ""),
+    )
     row["sidecar"] = build_sentence_sidecar(source, row, config).to_dict()
     return row
 

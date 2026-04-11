@@ -33,6 +33,9 @@ class SentenceSidecar:
     sigil: Optional[str] = None
     sigil_type: Optional[str] = None
     evidentiality: Optional[str] = None
+    register: Optional[str] = None
+    dialect: Optional[str] = None
+    scope_signature: Optional[str] = None
     tokens: Optional[List[Dict[str, Any]]] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -46,6 +49,9 @@ class SentenceSidecar:
             "sigil": self.sigil,
             "sigil_type": self.sigil_type,
             "evidentiality": self.evidentiality,
+            "register": self.register,
+            "dialect": self.dialect,
+            "scope_signature": self.scope_signature,
             "tokens": self.tokens,
         }
 
@@ -67,4 +73,10 @@ class SentenceSidecar:
             parts.append(f"sigil_type={self.sigil_type}")
         if self.evidentiality:
             parts.append(f"evidentiality={self.evidentiality}")
+        if self.register:
+            parts.append(f"register={self.register}")
+        if self.dialect:
+            parts.append(f"dialect={self.dialect}")
+        if self.scope_signature:
+            parts.append(f"scope={self.scope_signature}")
         return f"⟦ctx:{'; '.join(parts)}⟧"

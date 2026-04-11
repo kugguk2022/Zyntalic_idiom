@@ -42,6 +42,9 @@ export interface Sidecar {
   sigil_type: 'Reflection' | 'Irony' | null;
   anchor_weights: AnchorWeight[];
   evidentiality: string | null;
+  register?: string | null;
+  dialect?: string | null;
+  scope_signature?: string | null;
   pivot: 'diverge' | 'converge' | 'neutral';
   tokens: TokenMeta[] | null;
 }

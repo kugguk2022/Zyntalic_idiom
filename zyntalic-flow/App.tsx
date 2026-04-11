@@ -6,6 +6,9 @@ import SettingsBar from './components/SettingsBar';
 import SigilColumn from './components/SigilColumn';
 import AnchorBars from './components/AnchorBars';
 
+const formatAnchorLabel = (anchor: string): string =>
+  anchor.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+
 const App: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [outputResult, setOutputResult] = useState<TranslationResult | null>(null);
@@ -324,6 +327,36 @@ const App: React.FC = () => {
                             type={row.sidecar?.sigil_type ?? null}
                           />
                           <div className="min-w-0 flex-1">
+                            <div className="mb-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.18em]">
+                              {row.sidecar?.scope_signature && (
+                                <span className="rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-indigo-200">
+                                  Scope {row.sidecar.scope_signature}
+                                </span>
+                              )}
+                              {row.sidecar?.register && (
+                                <span className="rounded-full border border-slate-700 bg-slate-900/80 px-2 py-1 text-slate-300">
+                                  {row.sidecar.register}
+                                </span>
+                              )}
+                              {row.sidecar?.dialect && row.sidecar.dialect !== 'standard' && (
+                                <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200">
+                                  {row.sidecar.dialect}
+                                </span>
+                              )}
+                              {row.sidecar?.pivot && row.sidecar.pivot !== 'neutral' && (
+                                <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-200">
+                                  {row.sidecar.pivot}
+                                </span>
+                              )}
+                              {(row.sidecar?.frames ?? []).map((frame) => (
+                                <span
+                                  key={`${frame.id}-${frame.anchor}`}
+                                  className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-200"
+                                >
+                                  {frame.id}: {formatAnchorLabel(frame.anchor)}
+                                </span>
+                              ))}
+                            </div>
                             <div className="whitespace-pre-wrap">
                               {row.text}
                             </div>

@@ -346,7 +346,12 @@ def translate(req: TranslateRequest):
                 options=translation_options,
             )
         if cached:
-            if not cached.get("sidecar"):
+            sidecar = cached.get("sidecar") or {}
+            if (
+                not sidecar
+                or "scope_signature" not in sidecar
+                or "tokens" not in sidecar
+            ):
                 cached = None
         if cached:
             logger.info("Translate cache hit")
