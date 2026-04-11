@@ -4,7 +4,7 @@ import { TranslationConfig, TranslationResult } from "../types";
 // Resolve API base: prefer env, then browser origin, then localhost fallback.
 const API_BASE_URL = (import.meta as any)?.env?.VITE_API_BASE_URL
   || (typeof window !== "undefined" ? window.location.origin : "")
-  || "http://127.0.0.1:8001";
+  || "http://127.0.0.1:8000";
 
 export const performTranslation = async (
   text: string,
