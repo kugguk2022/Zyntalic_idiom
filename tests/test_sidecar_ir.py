@@ -66,6 +66,50 @@ def test_translate_text_scope_controls_change_target(monkeypatch):
     assert scoped["sidecar"]["dialect"] == "northern"
 
 
+def test_transformer_engine_respects_explicit_frame_selection(monkeypatch):
+    monkeypatch.setenv("ZYNTALIC_NLP", "none")
+    monkeypatch.setenv("ZYNTALIC_FAST", "1")
+    importlib.reload(translator)
+
+    row = translator.translate_text(
+        "Order remembers chaos.",
+        mirror_rate=0.2,
+        engine="transformer",
+        config={
+            "frame_a": "Sunzi_ArtOfWar",
+            "frame_b": "Plato_Republic",
+        },
+    )[0]
+
+    sidecar = row["sidecar"]
+    assert [frame["anchor"] for frame in sidecar["frames"]] == [
+        "Sunzi_ArtOfWar",
+        "Plato_Republic",
+    ]
+    assert [item["name"] for item in sidecar["anchor_weights"][:2]] == [
+        "Sunzi_ArtOfWar",
+        "Plato_Republic",
+    ]
+
+
+def test_no_frame_selection_keeps_frame_metadata_empty(monkeypatch):
+    monkeypatch.setenv("ZYNTALIC_NLP", "none")
+    monkeypatch.setenv("ZYNTALIC_FAST", "1")
+    importlib.reload(translator)
+
+    row = translator.translate_text(
+        "Order remembers chaos.",
+        mirror_rate=0.2,
+        engine="core",
+        config={
+            "frame_a": "",
+            "frame_b": "",
+        },
+    )[0]
+
+    assert row["sidecar"]["frames"] == []
+
+
 def test_rule1_enforces_context_tail_for_non_reverse_engine():
     target = translator._enforce_target_rules("surface only", "seed text", "core")
     assert "⟦ctx:" in target

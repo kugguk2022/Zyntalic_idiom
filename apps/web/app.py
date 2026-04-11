@@ -347,10 +347,30 @@ def translate(req: TranslateRequest):
             )
         if cached:
             sidecar = cached.get("sidecar") or {}
+            requested_frames = {
+                key: value
+                for key, value in (
+                    ("A", translation_options.get("frame_a", "")),
+                    ("B", translation_options.get("frame_b", "")),
+                )
+                if isinstance(value, str) and value.strip()
+            }
+            cached_frames = {
+                str(frame.get("id")): str(frame.get("anchor"))
+                for frame in sidecar.get("frames", [])
+                if isinstance(frame, dict)
+            }
+            cached_anchor_names = {
+                str(item.get("name"))
+                for item in sidecar.get("anchor_weights", [])
+                if isinstance(item, dict) and item.get("name")
+            }
             if (
                 not sidecar
                 or "scope_signature" not in sidecar
                 or "tokens" not in sidecar
+                or any(cached_frames.get(frame_id) != anchor for frame_id, anchor in requested_frames.items())
+                or any(anchor not in cached_anchor_names for anchor in requested_frames.values())
             ):
                 cached = None
         if cached:

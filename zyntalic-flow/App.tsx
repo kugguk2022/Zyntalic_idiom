@@ -365,7 +365,9 @@ const App: React.FC = () => {
                                 Evidentiality: {row.sidecar.evidentiality}
                               </div>
                             )}
-                            <AnchorBars weights={row.sidecar?.anchor_weights ?? []} />
+                            {(row.sidecar?.frames?.length ?? 0) > 0 && (
+                              <AnchorBars weights={row.sidecar?.anchor_weights ?? []} />
+                            )}
                           </div>
                         </div>
                       </div>

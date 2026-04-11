@@ -993,6 +993,32 @@ def anchor_weights_for_vec(vec: List[float], top_k: int = 3):
     return [(name, w) for (name, _), w in zip(top, weights)]
 
 
+def _normalize_anchor_override(anchor_weights: Optional[List[Tuple[str, float]]]) -> List[Tuple[str, float]]:
+    merged: Dict[str, float] = {}
+    order: List[str] = []
+    for item in anchor_weights or []:
+        if not isinstance(item, (list, tuple)) or len(item) < 2:
+            continue
+        name = str(item[0]).strip()
+        if not name:
+            continue
+        try:
+            weight = float(item[1])
+        except Exception:
+            continue
+        if weight <= 0:
+            continue
+        if name not in merged:
+            order.append(name)
+            merged[name] = 0.0
+        merged[name] += weight
+
+    total = sum(merged.values())
+    if total <= 0:
+        return []
+    return [(name, merged[name] / total) for name in order]
+
+
 def load_projection(path: str = "models/W.npy"):
     if np is None:
         return None
@@ -1021,10 +1047,30 @@ def apply_projection(vec: List[float], W) -> List[float]:
     return _normalize(v)
 
 
-def generate_embedding(seed_key: str, dim: int = 300, W=None):
+def generate_embedding(
+    seed_key: str,
+    dim: int = 300,
+    W=None,
+    anchor_weights_override: Optional[List[Tuple[str, float]]] = None,
+):
     vb = base_embedding(seed_key, dim)
     canon = apply_projection(vb, W)
-    if canon == vb and W is None:
+    forced = _normalize_anchor_override(anchor_weights_override)
+    if forced:
+        anchor_vecs = _get_anchor_vecs(len(canon))
+        vecs = [canon]
+        ws = [0.3]
+        for name, weight in forced:
+            av = anchor_vecs.get(name)
+            if av is None:
+                continue
+            vecs.append(av)
+            ws.append(0.7 * weight)
+        canon = _normalize(_mix(vecs, ws)) if len(vecs) > 1 else canon
+        aw = forced
+    elif anchor_weights_override is not None:
+        aw = []
+    elif canon == vb and W is None:
         # no projection: softly mix with anchors
         aw0 = anchor_weights_for_vec(vb, top_k=3)
         
@@ -1033,7 +1079,9 @@ def generate_embedding(seed_key: str, dim: int = 300, W=None):
         
         ws = [0.5] + [0.5 * w for _, w in aw0]
         canon = _normalize(_mix(vecs, ws))
-    aw = anchor_weights_for_vec(canon, top_k=3)
+        aw = anchor_weights_for_vec(canon, top_k=3)
+    else:
+        aw = anchor_weights_for_vec(canon, top_k=3)
     return canon, aw
 
 
@@ -1067,6 +1115,7 @@ def _generate_entry_legacy(
     W=None,
     mirror_state: Optional[MirrorState] = None,
     mirror_terms: Optional[List[Dict[str, str]]] = None,
+    anchor_weights_override: Optional[List[Tuple[str, float]]] = None,
 ) -> Dict:
     """Legacy single-pass generator retained as deterministic fallback."""
     rng = get_rng(seed_word)
@@ -1074,7 +1123,7 @@ def _generate_entry_legacy(
     w = generate_word(seed_word)
     pos_hint = "noun" if any(c in w for c in CHOSEONG) else "verb"
 
-    emb, aw = generate_embedding(seed_word, W=W)
+    emb, aw = generate_embedding(seed_word, W=W, anchor_weights_override=anchor_weights_override)
     chosen = [name for name, _ in aw]
     weights = [wgt for _, wgt in aw]
 
@@ -1108,6 +1157,7 @@ def _generate_entry_staged(
     W=None,
     mirror_state: Optional[MirrorState] = None,
     mirror_terms: Optional[List[Dict[str, str]]] = None,
+    anchor_weights_override: Optional[List[Tuple[str, float]]] = None,
 ) -> Dict:
     """Rule-guided staged generator.
 
@@ -1128,7 +1178,11 @@ def _generate_entry_staged(
     pos_hint = "noun" if any(c in token for c in CHOSEONG) else "verb"
 
     # Stage 2: semantic grounding
-    embedding, anchor_weights = generate_embedding(seed_word, W=W)
+    embedding, anchor_weights = generate_embedding(
+        seed_word,
+        W=W,
+        anchor_weights_override=anchor_weights_override,
+    )
     chosen = [name for name, _ in anchor_weights]
     weights = [wgt for _, wgt in anchor_weights]
 
@@ -1168,6 +1222,7 @@ def generate_entry(
     W=None,
     mirror_state: Optional[MirrorState] = None,
     mirror_terms: Optional[List[Dict[str, str]]] = None,
+    anchor_weights_override: Optional[List[Tuple[str, float]]] = None,
 ) -> Dict:
     """
     Generate a full dictionary entry deterministically.
@@ -1183,6 +1238,7 @@ def generate_entry(
                 W=W,
                 mirror_state=mirror_state,
                 mirror_terms=mirror_terms,
+                anchor_weights_override=anchor_weights_override,
             )
         except Exception:
             # Deterministic fallback path keeps generation available under stage failures.
@@ -1192,6 +1248,7 @@ def generate_entry(
                 W=W,
                 mirror_state=mirror_state,
                 mirror_terms=mirror_terms,
+                anchor_weights_override=anchor_weights_override,
             )
 
     return _generate_entry_legacy(
@@ -1200,6 +1257,7 @@ def generate_entry(
         W=W,
         mirror_state=mirror_state,
         mirror_terms=mirror_terms,
+        anchor_weights_override=anchor_weights_override,
     )
 
 

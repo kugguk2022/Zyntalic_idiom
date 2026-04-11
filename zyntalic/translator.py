@@ -134,6 +134,23 @@ def _requested_frame_names(config: Optional[Dict]) -> List[str]:
     return names
 
 
+def _requested_anchor_weights(config: Optional[Dict]) -> Optional[List[tuple[str, float]]]:
+    frame_names = _requested_frame_names(config)
+    if not frame_names:
+        return None
+
+    seen: List[str] = []
+    for name in frame_names:
+        if name not in seen:
+            seen.append(name)
+    if not seen:
+        return None
+    if len(seen) == 1:
+        return [(seen[0], 1.0)]
+    weight = 1.0 / len(seen)
+    return [(name, weight) for name in seen]
+
+
 def _coerce_anchor_pairs(raw) -> List[tuple[str, float]]:
     pairs: List[tuple[str, float]] = []
     for item in raw or []:
@@ -158,6 +175,12 @@ def _collect_anchor_weights(source: str, row: Dict, config: Optional[Dict]) -> L
     lookup_k = len(core.ANCHORS) if frame_names else 5
     weights: List[tuple[str, float]] = []
 
+    row_weights = _coerce_anchor_pairs(row.get("anchors"))
+    if frame_names:
+        row_names = {name for name, _ in row_weights}
+        if row_weights and all(frame_name in row_names for frame_name in frame_names):
+            return row_weights[:lookup_k]
+
     embedding = row.get("embedding")
     if embedding is not None:
         try:
@@ -166,7 +189,7 @@ def _collect_anchor_weights(source: str, row: Dict, config: Optional[Dict]) -> L
             weights = []
 
     if not weights:
-        weights = _coerce_anchor_pairs(row.get("anchors"))
+        weights = row_weights
 
     needs_full_lookup = bool(frame_names) and any(
         frame_name not in {name for name, _ in weights}
@@ -627,6 +650,7 @@ def translate_sentence(
     seed_text = _canonical_seed(src) or src
 
     mirror_terms = _extract_mirror_terms(src)
+    requested_anchor_weights = _requested_anchor_weights(config)
 
     if engine == "test_suite":
         try:
@@ -640,6 +664,7 @@ def translate_sentence(
                 W=W,
                 mirror_state=mirror_state,
                 mirror_terms=mirror_terms,
+                anchor_weights_override=requested_anchor_weights,
             )
             row = {
                 "source": src,
@@ -669,13 +694,31 @@ def translate_sentence(
 
     if engine == "transformer":
         try:
-            from .transformers import translate_transformer
+            forced_anchor_weights = requested_anchor_weights
+            if forced_anchor_weights is None:
+                from .transformers import semantic_match
+
+                matched_anchors = semantic_match(src, top_k=2)
+                if len(matched_anchors) >= 2:
+                    forced_anchor_weights = [(matched_anchors[0], 0.7), (matched_anchors[1], 0.3)]
+                elif matched_anchors:
+                    forced_anchor_weights = [(matched_anchors[0], 1.0)]
+
+            entry = core.generate_entry(
+                seed_text,
+                mirror_rate=mirror_rate,
+                W=W or _PROJECTION_W,
+                mirror_state=mirror_state,
+                mirror_terms=mirror_terms,
+                anchor_weights_override=forced_anchor_weights,
+            )
             row = {
                 "source": src,
-                "target": translate_transformer(src, mirror_rate=mirror_rate),
+                "target": entry["sentence"],
                 "lemma": lemma,
-                "anchors": [], # TODO: populate if needed
+                "anchors": entry["anchors"],
                 "engine": "transformer",
+                "embedding": entry.get("embedding"),
             }
             if mirror_rate > 0.75:
                 row["mirror_text"] = mirror_readback(seed_text, row.get("anchors", []), mirror_terms=mirror_terms)
@@ -708,6 +751,7 @@ def translate_sentence(
         W=W or _PROJECTION_W,
         mirror_state=mirror_state,
         mirror_terms=mirror_terms,
+        anchor_weights_override=requested_anchor_weights,
     )
     # entry contains 'sentence' (with ctx tail) and anchor weights
     row = {
