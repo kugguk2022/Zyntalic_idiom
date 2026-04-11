@@ -14,6 +14,7 @@ import json
 import math
 import os
 import random
+import re
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Iterable
@@ -119,6 +120,7 @@ JONGSEONG = [
 # Polish-inspired Latin characters.
 POLISH_CONSONANTS = "bcćdźfghjklłmnńprsśtwzźż"
 POLISH_VOWELS = "aąeęioóuy"
+POLISH_LATIN_CHARS = set((POLISH_CONSONANTS + POLISH_VOWELS + "qvx") + (POLISH_CONSONANTS + POLISH_VOWELS + "qvx").upper())
 
 # Strict vocab mode avoids generated syllables and keeps outputs within known mappings.
 _STRICT_VOCAB = os.getenv("ZYNTALIC_STRICT_VOCAB", "1").lower() not in ("0", "false", "no", "off")
@@ -694,11 +696,15 @@ def _mirror_tokens() -> List[str]:
             seen = set()
             for _ in range(min(12, len(verbs))):
                 tok = verbs[int(rng.random() * len(verbs))]
+                tok = _repair_surface_profile(tok, "verbs", f"mirror-token::{tok}")
                 if tok in seen:
                     continue
                 seen.add(tok)
                 picks.append(tok)
-            _MIRROR_TOKENS = picks or verbs[:8]
+            _MIRROR_TOKENS = picks or [
+                _repair_surface_profile(tok, "verbs", f"mirror-token::{tok}")
+                for tok in verbs[:8]
+            ]
         else:
             _MIRROR_TOKENS = []
         for pivot in pivots:
@@ -727,6 +733,47 @@ def _stable_pick(values: Iterable[str], seed: str) -> Optional[str]:
         return None
     rng = get_rng(seed)
     return vals[int(rng.random() * len(vals))]
+
+
+def _surface_script_counts(text: str) -> Dict[str, int]:
+    counts = {"hangul": 0, "latin": 0}
+    for ch in text or "":
+        if "\uac00" <= ch <= "\ud7af":
+            counts["hangul"] += 1
+        elif ("a" <= ch.lower() <= "z") or ch in POLISH_LATIN_CHARS:
+            counts["latin"] += 1
+    return counts
+
+
+def _surface_profile_ok(text: str, field: str) -> bool:
+    candidate = re.sub(r"\s+", "", text or "")
+    if not candidate:
+        return False
+
+    counts = _surface_script_counts(candidate)
+    total = counts["hangul"] + counts["latin"]
+    if total == 0:
+        return False
+
+    hangul_ratio = counts["hangul"] / total
+    field = (field or "").lower()
+
+    # Visible surface tokens should read as Polish/Latin; Hangul is reserved
+    # for the context tail emitted in the metadata block.
+    if field == "verbs":
+        return counts["latin"] >= 3 and counts["hangul"] == 0
+    if field == "adjectives":
+        return counts["latin"] >= 3 and counts["hangul"] == 0
+    if field == "nouns":
+        return counts["latin"] >= 3 and counts["hangul"] == 0
+    return counts["latin"] > 0
+
+
+def _repair_surface_profile(text: str, field: str, seed_key: str) -> str:
+    candidate = re.sub(r"\s+", "", text or "")
+    if _surface_profile_ok(candidate, field):
+        return candidate
+    return generate_word(seed_key)
 
 
 def _get_vocab_embeddings(field: str, vocab_mappings) -> Optional[Tuple[List[str], List[List[float]]]]:
@@ -760,7 +807,7 @@ def _map_term_to_zyntalic(
     key = (term or "").strip().lower()
     mapped = vocab_mappings.get(field, {}).get(key)
     if mapped:
-        return mapped
+        return _repair_surface_profile(mapped, field, f"{field}::{key}")
 
     # Try semantic nearest neighbor among vocabulary keys if embeddings are available.
     emb_pack = _get_vocab_embeddings(field, vocab_mappings)
@@ -778,7 +825,7 @@ def _map_term_to_zyntalic(
             match = keys[best_i]
             mapped = vocab_mappings.get(field, {}).get(match)
             if mapped:
-                return mapped
+                return _repair_surface_profile(mapped, field, f"{field}::{key}")
         except Exception:
             pass
 
@@ -786,7 +833,7 @@ def _map_term_to_zyntalic(
         values = list(vocab_mappings.get(field, {}).values())
         pick = _stable_pick(values, f"{field}::{key}") if values else None
         if pick:
-            return pick
+            return _repair_surface_profile(pick, field, f"{field}::{key}")
     return generate_word(f"{field}::{key}")
 
 
@@ -862,30 +909,11 @@ def plain_sentence_anchored(rng, anchors, weights) -> str:
     noun_en = _weighted_sample(rng, pool_noun, w_noun) or rng.choice(base_noun)
     verb_en = _weighted_sample(rng, pool_verb, w_verb) or rng.choice(base_verb)
 
-    # Try to translate to Zyntalic
     vocab_mappings = load_vocabulary_mappings()
-    
-    adj = vocab_mappings.get("adjectives", {}).get(adj_en)
-    noun = vocab_mappings.get("nouns", {}).get(noun_en)
-    verb = vocab_mappings.get("verbs", {}).get(verb_en)
 
-    if _STRICT_VOCAB:
-        adj_pool = list(vocab_mappings.get("adjectives", {}).values())
-        noun_pool = list(vocab_mappings.get("nouns", {}).values())
-        verb_pool = list(vocab_mappings.get("verbs", {}).values())
-        if not adj and adj_pool:
-            adj = adj_pool[int(rng.random() * len(adj_pool))]
-        if not noun and noun_pool:
-            noun = noun_pool[int(rng.random() * len(noun_pool))]
-        if not verb and verb_pool:
-            verb = verb_pool[int(rng.random() * len(verb_pool))]
-
-    if not adj:
-        adj = generate_word(f"adj::{adj_en}")
-    if not noun:
-        noun = generate_word(f"noun::{noun_en}")
-    if not verb:
-        verb = generate_word(f"verb::{verb_en}")
+    adj = _map_term_to_zyntalic(adj_en, "adjectives", rng=rng, vocab_mappings=vocab_mappings)
+    noun = _map_term_to_zyntalic(noun_en, "nouns", rng=rng, vocab_mappings=vocab_mappings)
+    verb = _map_term_to_zyntalic(verb_en, "verbs", rng=rng, vocab_mappings=vocab_mappings)
 
     particle = ""
     if _SENTENCE_PARTICLES and rng.random() < _PARTICLE_RATE:

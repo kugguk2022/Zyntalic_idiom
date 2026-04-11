@@ -495,6 +495,27 @@ def _clean_lemma(text: str) -> str:
     t = re.sub(r"\s+", " ", t).strip()
     return t.split()[0] if t else ""
 
+
+def _canonical_seed(text: str) -> str:
+    """Build a deterministic sentence-level seed instead of collapsing to one lemma."""
+    normalized = (text or "").strip()
+    if not normalized:
+        return ""
+
+    lemmas: List[str] = []
+    for token in nlp.analyze_tokens(normalized):
+        lemma = (token.get("lemma") or token.get("text") or "").strip().lower()
+        if not lemma or not re.search(r"[a-z0-9]", lemma):
+            continue
+        lemmas.append(lemma)
+
+    if lemmas:
+        return " ".join(lemmas)
+
+    fallback = re.sub(r"[^A-Za-z0-9'\- ]+", " ", normalized.lower())
+    fallback = re.sub(r"\s+", " ", fallback).strip()
+    return fallback or normalized
+
 def _batch_max_chars() -> int:
     raw = os.getenv("ZYNTALIC_BATCH_CHARS", "400").strip()
     try:
@@ -603,6 +624,7 @@ def translate_sentence(
     """
     src = (text or "").strip()
     lemma = _clean_lemma(src)
+    seed_text = _canonical_seed(src) or src
 
     mirror_terms = _extract_mirror_terms(src)
 
@@ -613,7 +635,7 @@ def translate_sentence(
             test_suite = ZyntalicTestSuite()
             # Use core engine for actual translation but add test metadata
             entry = core.generate_entry(
-                lemma or src,
+                seed_text,
                 mirror_rate=mirror_rate,
                 W=W,
                 mirror_state=mirror_state,
@@ -629,7 +651,7 @@ def translate_sentence(
                 "test_info": "Input validated with test suite"
             }
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(lemma or src, entry.get("anchors", []), mirror_terms=mirror_terms)
+                row["mirror_text"] = mirror_readback(seed_text, entry.get("anchors", []), mirror_terms=mirror_terms)
             return _attach_sidecar(row, src, config)
         except Exception as e:
             # Fall back to core if test suite fails
@@ -640,7 +662,7 @@ def translate_sentence(
             from .reverse import reverse_translate_sentence
             row = reverse_translate_sentence(src)
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(src, row.get("anchors", []), mirror_terms=mirror_terms)
+                row["mirror_text"] = mirror_readback(seed_text, row.get("anchors", []), mirror_terms=mirror_terms)
             return _attach_sidecar(row, src, config)
         except Exception:
             engine = "core"
@@ -656,7 +678,7 @@ def translate_sentence(
                 "engine": "transformer",
             }
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(src, row.get("anchors", []), mirror_terms=mirror_terms)
+                row["mirror_text"] = mirror_readback(seed_text, row.get("anchors", []), mirror_terms=mirror_terms)
             return _attach_sidecar(row, src, config)
         except Exception as e:
             # print(f"Transformer error: {e}") # debug
@@ -674,14 +696,14 @@ def translate_sentence(
                 "engine": "chiasmus",
             }
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(src, row.get("anchors", []), mirror_terms=mirror_terms)
+                row["mirror_text"] = mirror_readback(seed_text, row.get("anchors", []), mirror_terms=mirror_terms)
             return _attach_sidecar(row, src, config)
         except Exception:
             # fall back to core
             engine = "core"
 
     entry = core.generate_entry(
-        lemma or src,
+        seed_text,
         mirror_rate=mirror_rate,
         W=W or _PROJECTION_W,
         mirror_state=mirror_state,
@@ -697,7 +719,7 @@ def translate_sentence(
         "embedding": entry.get("embedding"),
     }
     if mirror_rate > 0.75:
-        row["mirror_text"] = mirror_readback(lemma or src, entry.get("anchors", []), mirror_terms=mirror_terms)
+        row["mirror_text"] = mirror_readback(seed_text, entry.get("anchors", []), mirror_terms=mirror_terms)
     return _attach_sidecar(row, src, config)
 
 
