@@ -17,9 +17,9 @@ Build a rule-first, deterministic synthetic language engine robust enough for LL
   - [x] Add explicit morphology-role checks (subject/object/verb markers)
   - [x] Add strict S-O-V-C conformance validator for generated surface forms
 
-- [ ] Rule 2: Deterministic quality gates
-  - [ ] Golden-set regression suite (200-500 prompts)
-  - [ ] Failing checks for script-ratio drift and context-tail violations
+- [~] Rule 2: Deterministic quality gates
+  - [x] Golden-set regression suite (initial 40-prompt seed; target 200-500)
+  - [x] Failing checks for script-ratio drift and context-tail violations
 
 - [ ] Rule 3: Generator upgrade (non-Gemini first)
   - [ ] Refactor generator into rule-guided assembly stages
