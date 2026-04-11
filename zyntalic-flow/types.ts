@@ -6,6 +6,8 @@ export enum TranslationEngine {
   REVERSE = 'Reverse (Zyntalic -> English)'
 }
 
+export type AnchorMode = 'auto' | 'manual' | 'neutral';
+
 export interface TranslationConfig {
   engine: TranslationEngine;
   mirror: number;
@@ -14,6 +16,8 @@ export interface TranslationConfig {
   evidentiality: string;
   register: string;
   dialect: string;
+  anchorMode: AnchorMode;
+  selectedAnchors: string[];
   frameA: string;
   frameB: string;
 }
@@ -41,6 +45,8 @@ export interface Sidecar {
   sigil: string | null;
   sigil_type: 'Reflection' | 'Irony' | null;
   anchor_weights: AnchorWeight[];
+  anchor_mode?: AnchorMode | null;
+  selected_anchors?: string[];
   evidentiality: string | null;
   register?: string | null;
   dialect?: string | null;

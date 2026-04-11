@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import json
 import io
 import os
@@ -98,6 +98,8 @@ class TranslateRequest(BaseModel):
     evidentiality: str = "direct"
     register: str = "formal"
     dialect: str = "standard"
+    anchor_mode: str = "auto"
+    selected_anchors: list[str] = Field(default_factory=list)
     frame_a: str = ""
     frame_b: str = ""
     zyntalic_only: bool = False
@@ -115,6 +117,8 @@ def _translation_options(req: TranslateRequest) -> dict:
         "evidentiality": payload.get("evidentiality", "direct"),
         "register": payload.get("register", "formal"),
         "dialect": payload.get("dialect", "standard"),
+        "anchor_mode": payload.get("anchor_mode", "auto"),
+        "selected_anchors": payload.get("selected_anchors", []),
         "frame_a": payload.get("frame_a", ""),
         "frame_b": payload.get("frame_b", ""),
     }
@@ -347,6 +351,12 @@ def translate(req: TranslateRequest):
             )
         if cached:
             sidecar = cached.get("sidecar") or {}
+            requested_anchor_mode = str(translation_options.get("anchor_mode", "auto"))
+            requested_selected = [
+                str(item)
+                for item in translation_options.get("selected_anchors", [])
+                if str(item).strip()
+            ]
             requested_frames = {
                 key: value
                 for key, value in (
@@ -369,6 +379,10 @@ def translate(req: TranslateRequest):
                 not sidecar
                 or "scope_signature" not in sidecar
                 or "tokens" not in sidecar
+                or "anchor_mode" not in sidecar
+                or "selected_anchors" not in sidecar
+                or str(sidecar.get("anchor_mode") or "auto") != requested_anchor_mode
+                or list(sidecar.get("selected_anchors") or []) != requested_selected
                 or any(cached_frames.get(frame_id) != anchor for frame_id, anchor in requested_frames.items())
                 or any(anchor not in cached_anchor_names for anchor in requested_frames.values())
             ):
@@ -379,6 +393,7 @@ def translate(req: TranslateRequest):
                 cached["mirror_text"] = mirror_readback(
                     cached.get("source", text),
                     cached.get("anchors", []),
+                    fallback_to_semantic=requested_anchor_mode != "neutral",
                 )
             if req.zyntalic_only:
                 return {

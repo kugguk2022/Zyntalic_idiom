@@ -73,15 +73,23 @@ export const performTranslation = async (
       engine = "test_suite";
     }
 
+    const selectedAnchors = config.anchorMode === "manual"
+      ? Array.from(new Set(config.selectedAnchors || []))
+      : [];
+    const frameA = config.anchorMode === "manual" ? (selectedAnchors[0] || "") : "";
+    const frameB = config.anchorMode === "manual" ? (selectedAnchors[1] || "") : "";
+
     const response = await postJsonWithFallback("/translate", {
       text,
       mirror_rate: config.mirror,
       engine,
+      anchor_mode: config.anchorMode,
+      selected_anchors: selectedAnchors,
       evidentiality: config.evidentiality,
       register: config.register,
       dialect: config.dialect,
-      frame_a: config.frameA,
-      frame_b: config.frameB,
+      frame_a: frameA,
+      frame_b: frameB,
       zyntalic_only: true,
     });
 

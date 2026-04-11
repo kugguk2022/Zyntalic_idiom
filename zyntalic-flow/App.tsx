@@ -28,6 +28,8 @@ const App: React.FC = () => {
     evidentiality: 'direct',
     register: 'formal',
     dialect: 'standard',
+    anchorMode: 'auto',
+    selectedAnchors: [],
     frameA: '',
     frameB: '',
   });
@@ -333,6 +335,11 @@ const App: React.FC = () => {
                                   Scope {row.sidecar.scope_signature}
                                 </span>
                               )}
+                              {row.sidecar?.anchor_mode && row.sidecar.anchor_mode !== 'auto' && (
+                                <span className="rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-2 py-1 text-fuchsia-200">
+                                  {row.sidecar.anchor_mode}
+                                </span>
+                              )}
                               {row.sidecar?.register && (
                                 <span className="rounded-full border border-slate-700 bg-slate-900/80 px-2 py-1 text-slate-300">
                                   {row.sidecar.register}
@@ -356,6 +363,16 @@ const App: React.FC = () => {
                                   {frame.id}: {formatAnchorLabel(frame.anchor)}
                                 </span>
                               ))}
+                              {(row.sidecar?.selected_anchors ?? [])
+                                .filter((anchor) => !(row.sidecar?.frames ?? []).some((frame) => frame.anchor === anchor))
+                                .map((anchor) => (
+                                  <span
+                                    key={`selected-${anchor}`}
+                                    className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200"
+                                  >
+                                    {formatAnchorLabel(anchor)}
+                                  </span>
+                                ))}
                             </div>
                             <div className="whitespace-pre-wrap">
                               {row.text}
@@ -365,7 +382,7 @@ const App: React.FC = () => {
                                 Evidentiality: {row.sidecar.evidentiality}
                               </div>
                             )}
-                            {(row.sidecar?.frames?.length ?? 0) > 0 && (
+                            {(((row.sidecar?.selected_anchors?.length ?? 0) > 0) || ((row.sidecar?.frames?.length ?? 0) > 0)) && (
                               <AnchorBars weights={row.sidecar?.anchor_weights ?? []} />
                             )}
                           </div>

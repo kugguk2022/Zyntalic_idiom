@@ -33,6 +33,8 @@ _SCOPE_DEFAULTS = {
     "frame_a": "",
     "frame_b": "",
 }
+_ANCHOR_MODE_DEFAULT = "auto"
+_ANCHOR_MODES = {"auto", "manual", "neutral"}
 _SCOPE_REGISTERS = {"formal", "informal", "literary", "archaic", "technical"}
 _SCOPE_DIALECTS = {"standard", "northern", "southern", "coastal", "mountain"}
 _DIALECT_REPLACEMENTS = {
@@ -75,7 +77,13 @@ def warm_translation_pipeline() -> None:
     except Exception as exc:  # pragma: no cover - defensive guard
         print(f"[warmup] Warning: preload skipped due to: {exc}")
 
-def mirror_readback(seed_text: str, anchors, mirror_terms: Optional[List[Dict[str, str]]] = None):
+def mirror_readback(
+    seed_text: str,
+    anchors,
+    mirror_terms: Optional[List[Dict[str, str]]] = None,
+    *,
+    fallback_to_semantic: bool = True,
+):
     """Build a deterministic mirror-readable English line from anchors or mirror terms."""
     try:
         rng = get_rng(f"mirror-readback::{seed_text}")
@@ -87,12 +95,16 @@ def mirror_readback(seed_text: str, anchors, mirror_terms: Optional[List[Dict[st
         else:
             A = B = None
         if not A or not B:
-            if not anchors:
+            if not anchors and fallback_to_semantic:
                 vec = core.base_embedding(seed_text or "", dim=300)
                 anchors = core.anchor_weights_for_vec(vec, top_k=2)
-            names = [name for name, _ in anchors] if anchors else core.ANCHORS[:2]
-            weights = [w for _, w in anchors] if anchors else [0.5, 0.5]
-            A, B = core._choose_motif(rng, names, weights)  # type: ignore[attr-defined]
+            if anchors:
+                names = [name for name, _ in anchors]
+                weights = [w for _, w in anchors]
+                A, B = core._choose_motif(rng, names, weights)  # type: ignore[attr-defined]
+            else:
+                fallback_pairs = getattr(core, "_DEFAULT_MOTIFS", [("order", "chaos")])
+                A, B = fallback_pairs[int(rng.random() * len(fallback_pairs))]
         templates = getattr(core, "_EN_MIRROR_TEMPLATES", ["To {A} through {B}; to {B} through {A}."])
         t = rng.choice(templates)
         return t.format(A=A, B=B)
@@ -124,23 +136,52 @@ def _normalize_scope_config(config: Optional[Dict]) -> Dict[str, str]:
     return normalized
 
 
-def _requested_frame_names(config: Optional[Dict]) -> List[str]:
+def _normalize_anchor_mode(config: Optional[Dict]) -> str:
+    if not config:
+        return _ANCHOR_MODE_DEFAULT
+    value = config.get("anchor_mode", _ANCHOR_MODE_DEFAULT)
+    if isinstance(value, str):
+        value = value.strip().lower()
+    else:
+        value = str(value).strip().lower()
+    return value if value in _ANCHOR_MODES else _ANCHOR_MODE_DEFAULT
+
+
+def _normalize_selected_anchors(config: Optional[Dict]) -> List[str]:
+    selected: List[str] = []
+    raw = (config or {}).get("selected_anchors", [])
+    if isinstance(raw, (list, tuple)):
+        for item in raw:
+            name = str(item).strip()
+            if not name or name not in core.ANCHORS or name in selected:
+                continue
+            selected.append(name)
+
     normalized = _normalize_scope_config(config)
-    names: List[str] = []
     for key in ("frame_a", "frame_b"):
-        value = normalized.get(key, "").strip()
-        if value:
-            names.append(value)
-    return names
+        name = normalized.get(key, "").strip()
+        if name and name in core.ANCHORS and name not in selected:
+            selected.append(name)
+    return selected
+
+
+def _requested_frame_names(config: Optional[Dict]) -> List[str]:
+    return _normalize_selected_anchors(config)[:2]
 
 
 def _requested_anchor_weights(config: Optional[Dict]) -> Optional[List[tuple[str, float]]]:
-    frame_names = _requested_frame_names(config)
-    if not frame_names:
+    anchor_mode = _normalize_anchor_mode(config)
+    selected = _normalize_selected_anchors(config)
+
+    if anchor_mode == "neutral":
+        return []
+    if anchor_mode == "manual" and not selected:
+        return []
+    if not selected:
         return None
 
     seen: List[str] = []
-    for name in frame_names:
+    for name in selected:
         if name not in seen:
             seen.append(name)
     if not seen:
@@ -171,15 +212,23 @@ def _coerce_anchor_pairs(raw) -> List[tuple[str, float]]:
 
 
 def _collect_anchor_weights(source: str, row: Dict, config: Optional[Dict]) -> List[tuple[str, float]]:
-    frame_names = _requested_frame_names(config)
-    lookup_k = len(core.ANCHORS) if frame_names else 5
+    anchor_mode = _normalize_anchor_mode(config)
+    requested_names = _normalize_selected_anchors(config)
+    requested_weights = _requested_anchor_weights(config) or []
+    lookup_k = len(core.ANCHORS) if requested_names else 5
     weights: List[tuple[str, float]] = []
 
     row_weights = _coerce_anchor_pairs(row.get("anchors"))
-    if frame_names:
+    if anchor_mode == "neutral":
+        return row_weights[:lookup_k] if row_weights else []
+
+    if requested_names:
         row_names = {name for name, _ in row_weights}
-        if row_weights and all(frame_name in row_names for frame_name in frame_names):
+        if row_weights and all(frame_name in row_names for frame_name in requested_names):
             return row_weights[:lookup_k]
+
+    if anchor_mode == "manual":
+        return row_weights[:lookup_k] if row_weights else requested_weights[:lookup_k]
 
     embedding = row.get("embedding")
     if embedding is not None:
@@ -191,9 +240,9 @@ def _collect_anchor_weights(source: str, row: Dict, config: Optional[Dict]) -> L
     if not weights:
         weights = row_weights
 
-    needs_full_lookup = bool(frame_names) and any(
+    needs_full_lookup = bool(requested_names) and any(
         frame_name not in {name for name, _ in weights}
-        for frame_name in frame_names
+        for frame_name in requested_names
     )
     if needs_full_lookup or not weights:
         try:
@@ -221,11 +270,14 @@ def _extract_sigil(text: str) -> tuple[Optional[str], Optional[str]]:
 
 def _scope_signature(config: Optional[Dict], anchor_weights: List[tuple[str, float]]) -> str:
     normalized = _normalize_scope_config(config)
+    payload_data = dict(normalized)
+    payload_data["anchor_mode"] = _normalize_anchor_mode(config)
+    payload_data["selected_anchors"] = _normalize_selected_anchors(config)
     anchor_blob = "-".join(
         name.split("_", 1)[-1].replace("_", "")[:4].upper()
         for name, _ in anchor_weights[:2]
     ) or "PLAIN"
-    payload = json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(payload_data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     digest = hashlib.blake2s(payload.encode("utf-8"), digest_size=3).hexdigest().upper()
     return f"{anchor_blob}-{digest}"
 
@@ -427,6 +479,8 @@ def _apply_dialect_surface(surface: str, dialect: str) -> str:
 
 def _context_scope_updates(config: Optional[Dict]) -> Dict[str, str]:
     normalized = _normalize_scope_config(config)
+    anchor_mode = _normalize_anchor_mode(config)
+    selected_anchors = _normalize_selected_anchors(config)
     updates: Dict[str, str] = {}
     if normalized["evidentiality"] != _SCOPE_DEFAULTS["evidentiality"]:
         updates["evidentiality"] = normalized["evidentiality"]
@@ -434,14 +488,16 @@ def _context_scope_updates(config: Optional[Dict]) -> Dict[str, str]:
         updates["register"] = normalized["register"]
     if normalized["dialect"] != _SCOPE_DEFAULTS["dialect"]:
         updates["dialect"] = normalized["dialect"]
+    if anchor_mode != _ANCHOR_MODE_DEFAULT:
+        updates["anchor_mode"] = anchor_mode
 
     frames = []
-    if normalized["frame_a"]:
-        frames.append(f"A:{normalized['frame_a']}")
-    if normalized["frame_b"]:
-        frames.append(f"B:{normalized['frame_b']}")
+    for index, anchor in enumerate(selected_anchors[:2]):
+        frames.append(f"{'AB'[index]}:{anchor}")
     if frames:
         updates["frames"] = "|".join(frames)
+    if anchor_mode == "manual" and selected_anchors:
+        updates["selected"] = "|".join(selected_anchors[:4])
     return updates
 
 
@@ -456,21 +512,20 @@ def _apply_requested_scope(target: str, source: str, config: Optional[Dict], eng
     if normalized["dialect"] != _SCOPE_DEFAULTS["dialect"]:
         surface = _apply_dialect_surface(surface, normalized["dialect"])
 
-    ctx_tail = _merge_context_tail(ctx_tail, _context_scope_updates(normalized))
+    ctx_tail = _merge_context_tail(ctx_tail, _context_scope_updates(config))
     return _compose_target(surface, ctx_tail)
 
 
 def build_sentence_sidecar(source: str, row: Dict, config: Optional[Dict] = None) -> SentenceSidecar:
+    anchor_mode = _normalize_anchor_mode(config)
+    selected_anchors = _normalize_selected_anchors(config)
     anchor_weights = _collect_anchor_weights(source, row, config)
     weight_map = {name: weight for name, weight in anchor_weights}
     normalized = _normalize_scope_config(config)
     frames: List[Frame] = []
-    for frame_id, key in (("A", "frame_a"), ("B", "frame_b")):
-        anchor = normalized.get(key, "")
-        anchor = anchor.strip() if isinstance(anchor, str) else ""
-        if not anchor:
-            continue
-        frames.append(Frame(id=frame_id, anchor=anchor, weight=weight_map.get(anchor, 0.0)))
+    if anchor_mode != "neutral":
+        for index, anchor in enumerate(selected_anchors[:2]):
+            frames.append(Frame(id="AB"[index], anchor=anchor, weight=weight_map.get(anchor, 0.0)))
 
     sigil, sigil_type = _extract_sigil(source)
     evidentiality = (config or {}).get("evidentiality")
@@ -480,12 +535,14 @@ def build_sentence_sidecar(source: str, row: Dict, config: Optional[Dict] = None
         frames=frames,
         pivot=_resolve_pivot(frames),
         anchor_weights=anchor_weights[:5],
+        anchor_mode=anchor_mode,
+        selected_anchors=selected_anchors,
         sigil=sigil,
         sigil_type=sigil_type,
         evidentiality=evidentiality or None,
         register=normalized["register"] or None,
         dialect=normalized["dialect"] or None,
-        scope_signature=_scope_signature(normalized, anchor_weights[:5]),
+        scope_signature=_scope_signature(config, anchor_weights[:5]),
         tokens=_token_sidecar(source),
     )
 
@@ -650,6 +707,7 @@ def translate_sentence(
     seed_text = _canonical_seed(src) or src
 
     mirror_terms = _extract_mirror_terms(src)
+    allow_inferred_anchors = _normalize_anchor_mode(config) != "neutral"
     requested_anchor_weights = _requested_anchor_weights(config)
 
     if engine == "test_suite":
@@ -676,7 +734,12 @@ def translate_sentence(
                 "test_info": "Input validated with test suite"
             }
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(seed_text, entry.get("anchors", []), mirror_terms=mirror_terms)
+                row["mirror_text"] = mirror_readback(
+                    seed_text,
+                    entry.get("anchors", []),
+                    mirror_terms=mirror_terms,
+                    fallback_to_semantic=allow_inferred_anchors,
+                )
             return _attach_sidecar(row, src, config)
         except Exception as e:
             # Fall back to core if test suite fails
@@ -687,7 +750,12 @@ def translate_sentence(
             from .reverse import reverse_translate_sentence
             row = reverse_translate_sentence(src)
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(seed_text, row.get("anchors", []), mirror_terms=mirror_terms)
+                row["mirror_text"] = mirror_readback(
+                    seed_text,
+                    row.get("anchors", []),
+                    mirror_terms=mirror_terms,
+                    fallback_to_semantic=allow_inferred_anchors,
+                )
             return _attach_sidecar(row, src, config)
         except Exception:
             engine = "core"
@@ -721,7 +789,12 @@ def translate_sentence(
                 "embedding": entry.get("embedding"),
             }
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(seed_text, row.get("anchors", []), mirror_terms=mirror_terms)
+                row["mirror_text"] = mirror_readback(
+                    seed_text,
+                    row.get("anchors", []),
+                    mirror_terms=mirror_terms,
+                    fallback_to_semantic=allow_inferred_anchors,
+                )
             return _attach_sidecar(row, src, config)
         except Exception as e:
             # print(f"Transformer error: {e}") # debug
@@ -739,7 +812,12 @@ def translate_sentence(
                 "engine": "chiasmus",
             }
             if mirror_rate > 0.75:
-                row["mirror_text"] = mirror_readback(seed_text, row.get("anchors", []), mirror_terms=mirror_terms)
+                row["mirror_text"] = mirror_readback(
+                    seed_text,
+                    row.get("anchors", []),
+                    mirror_terms=mirror_terms,
+                    fallback_to_semantic=allow_inferred_anchors,
+                )
             return _attach_sidecar(row, src, config)
         except Exception:
             # fall back to core
@@ -763,7 +841,12 @@ def translate_sentence(
         "embedding": entry.get("embedding"),
     }
     if mirror_rate > 0.75:
-        row["mirror_text"] = mirror_readback(seed_text, entry.get("anchors", []), mirror_terms=mirror_terms)
+        row["mirror_text"] = mirror_readback(
+            seed_text,
+            entry.get("anchors", []),
+            mirror_terms=mirror_terms,
+            fallback_to_semantic=allow_inferred_anchors,
+        )
     return _attach_sidecar(row, src, config)
 
 

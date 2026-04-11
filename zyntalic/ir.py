@@ -30,6 +30,8 @@ class SentenceSidecar:
     frames: List[Frame] = field(default_factory=list)
     pivot: PivotType = PivotType.NEUTRAL
     anchor_weights: List[Tuple[str, float]] = field(default_factory=list)
+    anchor_mode: Optional[str] = None
+    selected_anchors: List[str] = field(default_factory=list)
     sigil: Optional[str] = None
     sigil_type: Optional[str] = None
     evidentiality: Optional[str] = None
@@ -46,6 +48,8 @@ class SentenceSidecar:
                 {"name": name, "weight": float(weight)}
                 for name, weight in self.anchor_weights
             ],
+            "anchor_mode": self.anchor_mode,
+            "selected_anchors": list(self.selected_anchors),
             "sigil": self.sigil,
             "sigil_type": self.sigil_type,
             "evidentiality": self.evidentiality,
@@ -67,6 +71,10 @@ class SentenceSidecar:
                 f"{name}:{weight:.3f}" for name, weight in self.anchor_weights
             )
             parts.append(f"anchors={anchor_blob}")
+        if self.anchor_mode:
+            parts.append(f"anchor_mode={self.anchor_mode}")
+        if self.selected_anchors:
+            parts.append(f"selected={ '|'.join(self.selected_anchors[:4]) }")
         if self.sigil:
             parts.append(f"sigil={self.sigil}")
         if self.sigil_type:

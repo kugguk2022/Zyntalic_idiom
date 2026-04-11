@@ -28,6 +28,11 @@ def test_translate_text_attaches_sidecar(monkeypatch):
     assert sidecar["evidentiality"] == "inferential"
     assert sidecar["register"] == "formal"
     assert sidecar["dialect"] == "standard"
+    assert sidecar["anchor_mode"] == "auto"
+    assert sidecar["selected_anchors"] == [
+        "Sunzi_ArtOfWar",
+        "Dostoevsky_BrothersKaramazov",
+    ]
     assert sidecar["scope_signature"]
     assert len(sidecar["anchor_weights"]) > 0
     assert all("name" in item and "weight" in item for item in sidecar["anchor_weights"])
@@ -76,8 +81,8 @@ def test_transformer_engine_respects_explicit_frame_selection(monkeypatch):
         mirror_rate=0.2,
         engine="transformer",
         config={
-            "frame_a": "Sunzi_ArtOfWar",
-            "frame_b": "Plato_Republic",
+            "anchor_mode": "manual",
+            "selected_anchors": ["Sunzi_ArtOfWar", "Plato_Republic"],
         },
     )[0]
 
@@ -90,6 +95,8 @@ def test_transformer_engine_respects_explicit_frame_selection(monkeypatch):
         "Sunzi_ArtOfWar",
         "Plato_Republic",
     ]
+    assert sidecar["anchor_mode"] == "manual"
+    assert sidecar["selected_anchors"] == ["Sunzi_ArtOfWar", "Plato_Republic"]
 
 
 def test_no_frame_selection_keeps_frame_metadata_empty(monkeypatch):
@@ -108,6 +115,60 @@ def test_no_frame_selection_keeps_frame_metadata_empty(monkeypatch):
     )[0]
 
     assert row["sidecar"]["frames"] == []
+    assert row["sidecar"]["anchor_mode"] == "auto"
+
+
+def test_neutral_anchor_mode_disables_anchor_inference(monkeypatch):
+    monkeypatch.setenv("ZYNTALIC_NLP", "none")
+    monkeypatch.setenv("ZYNTALIC_FAST", "1")
+    importlib.reload(translator)
+
+    row = translator.translate_text(
+        "Order remembers chaos.",
+        mirror_rate=0.2,
+        engine="core",
+        config={
+            "anchor_mode": "neutral",
+            "selected_anchors": ["Sunzi_ArtOfWar", "Plato_Republic"],
+        },
+    )[0]
+
+    assert row["sidecar"]["anchor_mode"] == "neutral"
+    assert row["sidecar"]["frames"] == []
+    assert row["sidecar"]["anchor_weights"] == []
+
+
+def test_manual_anchor_mode_accepts_more_than_two_selected_anchors(monkeypatch):
+    monkeypatch.setenv("ZYNTALIC_NLP", "none")
+    monkeypatch.setenv("ZYNTALIC_FAST", "1")
+    importlib.reload(translator)
+
+    row = translator.translate_text(
+        "Order remembers chaos.",
+        mirror_rate=0.2,
+        engine="core",
+        config={
+            "anchor_mode": "manual",
+            "selected_anchors": [
+                "Sunzi_ArtOfWar",
+                "Plato_Republic",
+                "Spinoza_Ethics",
+            ],
+        },
+    )[0]
+
+    sidecar = row["sidecar"]
+    assert sidecar["anchor_mode"] == "manual"
+    assert sidecar["selected_anchors"] == [
+        "Sunzi_ArtOfWar",
+        "Plato_Republic",
+        "Spinoza_Ethics",
+    ]
+    assert [item["name"] for item in sidecar["anchor_weights"][:3]] == [
+        "Sunzi_ArtOfWar",
+        "Plato_Republic",
+        "Spinoza_Ethics",
+    ]
 
 
 def test_rule1_enforces_context_tail_for_non_reverse_engine():
