@@ -18,6 +18,7 @@ from typing import Dict, List, Optional
 
 from . import core
 from . import nlp
+from . import syntax
 from .chiasmus import generate_mirror_sigil
 from .ir import Frame, PivotType, SentenceSidecar
 from .utils.rng import get_rng
@@ -278,6 +279,40 @@ def _minimal_context_tail(seed_text: str) -> str:
     return f"⟦ctx:han={core.make_korean_tail(seed)}⟧"
 
 
+def _grammar_scope_updates(source: str) -> Dict[str, str]:
+    """Build deterministic grammar metadata tags from parsed source text."""
+    try:
+        parsed = syntax.to_zyntalic_order(source or "")
+    except Exception:
+        return {}
+
+    subj = "1" if (parsed.subject or "").strip() else "0"
+    obj = "1" if (parsed.obj or "").strip() else "0"
+    verb = "1" if (parsed.verb or "").strip() else "0"
+    ctx = "1" if (parsed.context or "").strip() else "0"
+
+    return {
+        "order": "SOVC",
+        "roles": f"S{subj}|O{obj}|V{verb}|C{ctx}",
+    }
+
+
+def _parse_context_fields(ctx_tail: Optional[str]) -> Dict[str, str]:
+    fields: Dict[str, str] = {}
+    if not ctx_tail or not ctx_tail.startswith("⟦ctx:") or not ctx_tail.endswith("⟧"):
+        return fields
+    inner = ctx_tail[len("⟦ctx:"):-1].strip()
+    for part in [p.strip() for p in inner.split(";") if p.strip()]:
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if key:
+            fields[key] = value
+    return fields
+
+
 def _enforce_target_rules(target: str, source: str, engine: str) -> str:
     """Apply canonical output rules before rows are returned.
 
@@ -305,6 +340,9 @@ def _enforce_target_rules(target: str, source: str, engine: str) -> str:
     if engine != "reverse" and not ctx_tail:
         ctx_tail = _minimal_context_tail(source or surface)
 
+    if engine != "reverse":
+        ctx_tail = _merge_context_tail(ctx_tail, _grammar_scope_updates(source or surface))
+
     return _compose_target(surface, ctx_tail)
 
 
@@ -319,6 +357,14 @@ def _validate_target_rules(target: str, engine: str) -> List[str]:
             warnings.append("missing_context_tail")
         if not normalized.endswith("⟧"):
             warnings.append("context_not_final")
+
+        _, ctx_tail = _split_context_tail(normalized)
+        fields = _parse_context_fields(ctx_tail)
+        if fields.get("order") != "SOVC":
+            warnings.append("missing_or_invalid_order_tag")
+        roles = fields.get("roles", "")
+        if not re.fullmatch(r"S[01]\|O[01]\|V[01]\|C[01]", roles):
+            warnings.append("missing_or_invalid_roles_tag")
 
     if ctx_count > 1:
         warnings.append("multiple_context_tails")

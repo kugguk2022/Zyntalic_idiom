@@ -14,8 +14,8 @@ Build a rule-first, deterministic synthetic language engine robust enough for LL
   - [x] Add canonical post-processing stage in translator pipeline
   - [x] Enforce context-tail presence/finality for non-reverse engines
   - [x] Add rule-validation warnings for malformed outputs
-  - [ ] Add explicit morphology-role checks (subject/object/verb markers)
-  - [ ] Add strict S-O-V-C conformance validator for generated surface forms
+  - [x] Add explicit morphology-role checks (subject/object/verb markers)
+  - [x] Add strict S-O-V-C conformance validator for generated surface forms
 
 - [ ] Rule 2: Deterministic quality gates
   - [ ] Golden-set regression suite (200-500 prompts)

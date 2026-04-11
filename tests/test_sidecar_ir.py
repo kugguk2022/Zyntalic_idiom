@@ -76,3 +76,16 @@ def test_rule1_validation_flags_multiple_context_tails():
     bad = "alpha ⟦ctx:han=가나⟧ beta ⟦ctx:han=다라⟧"
     warnings = translator._validate_target_rules(bad, "core")
     assert "multiple_context_tails" in warnings
+
+
+def test_rule1_enforces_sovc_and_roles_tags():
+    target = translator._enforce_target_rules("surface only", "I see the river at night.", "core")
+    assert "order=SOVC" in target
+    assert "roles=S1|O1|V1|C1" in target
+
+
+def test_rule1_validation_flags_missing_roles_and_order():
+    bad = "surface ⟦ctx:han=가나⟧"
+    warnings = translator._validate_target_rules(bad, "core")
+    assert "missing_or_invalid_order_tag" in warnings
+    assert "missing_or_invalid_roles_tag" in warnings
