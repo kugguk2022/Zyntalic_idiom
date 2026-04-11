@@ -23,6 +23,8 @@ from pathlib import Path
 
 _MODEL = None
 _DIM: Optional[int] = None
+_MODEL_ATTEMPTED = False
+_MODEL_LOCK = threading.Lock()
 
 _DEFAULT_MODEL = "all-MiniLM-L6-v2"
 _MODEL_NAME = os.getenv("ZYNTALIC_EMBEDDING_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
@@ -160,27 +162,31 @@ def _store_cached_vector(text: str, dim: int, vec: List[float]) -> None:
 atexit.register(lambda: _flush_cache(force=True))
 
 def _lazy_load_model() -> None:
-    global _MODEL, _DIM
-    if _MODEL is not None:
+    global _MODEL, _DIM, _MODEL_ATTEMPTED
+    if _MODEL is not None or _MODEL_ATTEMPTED:
         return
-    if _HASH_ONLY:
-        _MODEL = None
-        _DIM = None
-        return
-    try:
-        from sentence_transformers import SentenceTransformer  # type: ignore
-        model_name = _resolve_model_name(_MODEL_NAME)
+    with _MODEL_LOCK:
+        if _MODEL is not None or _MODEL_ATTEMPTED:
+            return
+        _MODEL_ATTEMPTED = True
+        if _HASH_ONLY:
+            _MODEL = None
+            _DIM = None
+            return
         try:
-            _MODEL = SentenceTransformer(model_name)
+            from sentence_transformers import SentenceTransformer  # type: ignore
+            model_name = _resolve_model_name(_MODEL_NAME)
+            try:
+                _MODEL = SentenceTransformer(model_name)
+            except Exception:
+                if model_name != _DEFAULT_MODEL:
+                    _MODEL = SentenceTransformer(_DEFAULT_MODEL)
+                else:
+                    raise
+            _DIM = int(_MODEL.get_sentence_embedding_dimension())
         except Exception:
-            if model_name != _DEFAULT_MODEL:
-                _MODEL = SentenceTransformer(_DEFAULT_MODEL)
-            else:
-                raise
-        _DIM = int(_MODEL.get_sentence_embedding_dimension())
-    except Exception:
-        _MODEL = None
-        _DIM = None
+            _MODEL = None
+            _DIM = None
 
 
 def embed_text(text: str, dim: int = 300) -> List[float]:

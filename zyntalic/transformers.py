@@ -13,6 +13,7 @@ except ImportError:
     SentenceTransformer = None
 
 _MODEL = None
+_MODEL_ATTEMPTED = False
 _DEFAULT_MODEL = "all-MiniLM-L6-v2"
 _MODEL_NAME = os.getenv("ZYNTALIC_EMBEDDING_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
 _MODEL_ALIASES = {
@@ -26,7 +27,7 @@ _MODEL_ALIASES = {
 from . import core
 
 def get_model():
-    global _MODEL, SentenceTransformer
+    global _MODEL, _MODEL_ATTEMPTED, SentenceTransformer
     
     # Lazy import if not already imported (though we check module availability above)
     if SentenceTransformer is None:
@@ -35,8 +36,9 @@ def get_model():
         except ImportError:
             return None
 
-    if _MODEL is None:
+    if _MODEL is None and not _MODEL_ATTEMPTED:
         try:
+            _MODEL_ATTEMPTED = True
             # resilient, lightweight model
             name = _MODEL_ALIASES.get(_MODEL_NAME.lower(), _MODEL_NAME)
             try:
