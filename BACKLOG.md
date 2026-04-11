@@ -21,9 +21,9 @@ Build a rule-first, deterministic synthetic language engine robust enough for LL
   - [x] Golden-set regression suite (initial 40-prompt seed; target 200-500)
   - [x] Failing checks for script-ratio drift and context-tail violations
 
-- [ ] Rule 3: Generator upgrade (non-Gemini first)
-  - [ ] Refactor generator into rule-guided assembly stages
-  - [ ] Add deterministic fallback behavior for all stages
+- [~] Rule 3: Generator upgrade (non-Gemini first)
+  - [x] Refactor generator into rule-guided assembly stages
+  - [x] Add deterministic fallback behavior for all stages
 
 ## P1 - Embeddings and Semantic Grounding
 

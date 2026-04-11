@@ -1009,6 +1009,130 @@ def generate_embedding(seed_key: str, dim: int = 300, W=None):
     return canon, aw
 
 
+def _build_context_terms(
+    mirror_terms: Optional[List[Dict[str, str]]],
+    rng,
+) -> Optional[List[str]]:
+    """Map optional readback terms into deterministic Zyntalic context keywords."""
+    if not (_CTX_READBACK and mirror_terms):
+        return None
+
+    ctx_terms: List[str] = []
+    for t in mirror_terms:
+        if len(ctx_terms) >= max(1, _CTX_KEYWORD_COUNT):
+            break
+        if isinstance(t, dict):
+            term = t.get("term") or ""
+            field = t.get("pos") or "nouns"
+        else:
+            term = str(t)
+            field = "nouns"
+        if not term:
+            continue
+        ctx_terms.append(_map_term_to_zyntalic(term, field, rng=rng))
+    return ctx_terms
+
+
+def _generate_entry_legacy(
+    seed_word: str,
+    mirror_rate: float = 0.3,
+    W=None,
+    mirror_state: Optional[MirrorState] = None,
+    mirror_terms: Optional[List[Dict[str, str]]] = None,
+) -> Dict:
+    """Legacy single-pass generator retained as deterministic fallback."""
+    rng = get_rng(seed_word)
+
+    w = generate_word(seed_word)
+    pos_hint = "noun" if any(c in w for c in CHOSEONG) else "verb"
+
+    emb, aw = generate_embedding(seed_word, W=W)
+    chosen = [name for name, _ in aw]
+    weights = [wgt for _, wgt in aw]
+
+    ctx_terms = _build_context_terms(mirror_terms, rng)
+
+    if rng.random() < mirror_rate:
+        sent_core = mirrored_sentence_anchored(
+            rng,
+            chosen,
+            weights,
+            mirror_state=mirror_state,
+            mirror_terms=mirror_terms,
+        )
+    else:
+        sent_core = plain_sentence_anchored(rng, chosen, weights)
+
+    sentence = f"{sent_core} {make_context(seed_word, w, chosen, pos_hint, ctx_terms=ctx_terms)}"
+
+    return {
+        "word": w,
+        "meaning": sent_core,
+        "sentence": sentence,
+        "anchors": aw,
+        "embedding": emb,
+    }
+
+
+def _generate_entry_staged(
+    seed_word: str,
+    mirror_rate: float = 0.3,
+    W=None,
+    mirror_state: Optional[MirrorState] = None,
+    mirror_terms: Optional[List[Dict[str, str]]] = None,
+) -> Dict:
+    """Rule-guided staged generator.
+
+    Stages:
+    1) Lexical token selection
+    2) Semantic grounding (embedding + anchors)
+    3) Surface realization (plain vs mirrored)
+    4) Context composition (final context tail)
+    """
+    # Test hook to verify deterministic fallback behavior.
+    if os.getenv("ZYNTALIC_STAGE_FORCE_FAIL", "0").lower() in ("1", "true", "yes", "on"):
+        raise RuntimeError("Forced staged-generation failure")
+
+    rng = get_rng(seed_word)
+
+    # Stage 1: lexical token
+    token = generate_word(seed_word)
+    pos_hint = "noun" if any(c in token for c in CHOSEONG) else "verb"
+
+    # Stage 2: semantic grounding
+    embedding, anchor_weights = generate_embedding(seed_word, W=W)
+    chosen = [name for name, _ in anchor_weights]
+    weights = [wgt for _, wgt in anchor_weights]
+
+    # Stage 3: surface realization
+    if rng.random() < mirror_rate:
+        surface = mirrored_sentence_anchored(
+            rng,
+            chosen,
+            weights,
+            mirror_state=mirror_state,
+            mirror_terms=mirror_terms,
+        )
+    else:
+        surface = plain_sentence_anchored(rng, chosen, weights)
+
+    # Stage 4: context tail
+    ctx_terms = _build_context_terms(mirror_terms, rng)
+    sentence = f"{surface} {make_context(seed_word, token, chosen, pos_hint, ctx_terms=ctx_terms)}"
+
+    return {
+        "word": token,
+        "meaning": surface,
+        "sentence": sentence,
+        "anchors": anchor_weights,
+        "embedding": embedding,
+    }
+
+
+def _use_staged_generator() -> bool:
+    return os.getenv("ZYNTALIC_USE_STAGED_GENERATOR", "1").lower() not in ("0", "false", "no", "off")
+
+
 # -------------------- Public API --------------------
 def generate_entry(
     seed_word: str,
@@ -1023,56 +1147,32 @@ def generate_entry(
     mirror_rate: Probability of using chiasmus templates (0.0-1.0).
                  Lower values produce more Zyntalic vocabulary output.
     """
-    rng = get_rng(seed_word)
+    if _use_staged_generator():
+        try:
+            return _generate_entry_staged(
+                seed_word,
+                mirror_rate=mirror_rate,
+                W=W,
+                mirror_state=mirror_state,
+                mirror_terms=mirror_terms,
+            )
+        except Exception:
+            # Deterministic fallback path keeps generation available under stage failures.
+            return _generate_entry_legacy(
+                seed_word,
+                mirror_rate=mirror_rate,
+                W=W,
+                mirror_state=mirror_state,
+                mirror_terms=mirror_terms,
+            )
 
-    # 1. Zyntalic Token (deterministic)
-    w = generate_word(seed_word)
-    pos_hint = "noun" if any(c in w for c in CHOSEONG) else "verb"
-
-    # 2. Embedding & Anchors (seeded by the same key)
-    emb, aw = generate_embedding(seed_word, W=W)
-    chosen = [name for name, _ in aw]
-    weights = [wgt for _, wgt in aw]
-
-    # Optional context keywords for readback mode.
-    ctx_terms = None
-    if _CTX_READBACK and mirror_terms:
-        ctx_terms = []
-        for t in mirror_terms:
-            if len(ctx_terms) >= max(1, _CTX_KEYWORD_COUNT):
-                break
-            if isinstance(t, dict):
-                term = t.get("term") or ""
-                field = t.get("pos") or "nouns"
-            else:
-                term = str(t)
-                field = "nouns"
-            if not term:
-                continue
-            ctx_terms.append(_map_term_to_zyntalic(term, field, rng=rng))
-
-    # 3. Sentence
-    if rng.random() < mirror_rate:
-        sent_core = mirrored_sentence_anchored(
-            rng,
-            chosen,
-            weights,
-            mirror_state=mirror_state,
-            mirror_terms=mirror_terms,
-        )
-    else:
-        sent_core = plain_sentence_anchored(rng, chosen, weights)
-
-    # 4. Context (kept at the end per S-O-V-C rule)
-    sentence = f"{sent_core} {make_context(seed_word, w, chosen, pos_hint, ctx_terms=ctx_terms)}"
-
-    return {
-        "word": w,
-        "meaning": sent_core,
-        "sentence": sentence,
-        "anchors": aw,
-        "embedding": emb,
-    }
+    return _generate_entry_legacy(
+        seed_word,
+        mirror_rate=mirror_rate,
+        W=W,
+        mirror_state=mirror_state,
+        mirror_terms=mirror_terms,
+    )
 
 
 def export_to_txt(entries, filename="zyntalic_words.txt"):
