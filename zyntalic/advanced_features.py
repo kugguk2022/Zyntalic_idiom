@@ -541,17 +541,17 @@ class AdvancedZyntalicProcessor:
 
     # -------------------- Test Compatibility Methods --------------------
 
-    def translate_with_analysis(self, text: str) -> TranslationResult:
+    def translate_with_analysis(self, text: str) -> AdvancedTranslationResult:
         """Translate text with full analysis (alias for compatibility)."""
         variation = LanguageVariation(register=Register.FORMAL)
         return self.translate_advanced(text, variation)
 
-    def translate_with_register(self, text: str, register: Register) -> TranslationResult:
+    def translate_with_register(self, text: str, register: Register) -> AdvancedTranslationResult:
         """Translate text with specific register (alias for compatibility)."""
         variation = LanguageVariation(register=register)
         return self.translate_advanced(text, variation)
 
-    def translate_with_dialect(self, text: str, dialect: Dialect) -> TranslationResult:
+    def translate_with_dialect(self, text: str, dialect: Dialect) -> AdvancedTranslationResult:
         """Translate text with specific dialect (alias for compatibility)."""
         variation = LanguageVariation(dialect=dialect)
         options = TranslationOptions(use_dialectal_forms=True)

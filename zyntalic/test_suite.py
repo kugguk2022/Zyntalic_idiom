@@ -12,6 +12,7 @@ Complete test coverage for all Zyntalic language systems including:
 
 from __future__ import annotations
 
+import gc
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -999,7 +1000,7 @@ class ZyntalicTestSuite:
                     inflected = self.morphology.inflect_noun(test_root, case=case)
                     if inflected.surface_form:
                         cases_working += 1
-                except:
+                except Exception:
                     pass
 
             completeness = cases_working / len(Case)
@@ -1044,7 +1045,7 @@ class ZyntalicTestSuite:
                         derived = self.morphology.derive_word(root, deriv_type)
                         if derived.surface_form != root:
                             successful_derivations += 1
-                    except:
+                    except Exception:
                         pass
 
             productivity = successful_derivations / total_attempts

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Manual demo of PDF text cleaning."""
 
 import re
@@ -37,7 +36,6 @@ def clean_pdf_text(raw_text: str) -> str:
     replacements = {
         '�': '',
         '\x00': '',
-        '\ufffd': '',
         '\r\n': '\n',
         '\r': '\n',
     }
@@ -67,5 +65,5 @@ def _demo():
     print(cleaned or "(No readable content)")
 
 
-+if __name__ == "__main__":
-+    _demo()
+if __name__ == "__main__":
+    _demo()

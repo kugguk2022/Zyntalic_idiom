@@ -802,9 +802,24 @@ def _map_term_to_zyntalic(
     if vocab_mappings is None:
         vocab_mappings = load_vocabulary_mappings()
     key = (term or "").strip().lower()
+
+    # Pre-compute the surface-compatible value pool once for strict mode.
+    if _STRICT_VOCAB:
+        values = list(vocab_mappings.get(field, {}).values())
+        surface_ok = [v for v in values if _surface_profile_ok(re.sub(r"\s+", "", v), field)]
+        pick_pool = surface_ok if surface_ok else values
+    else:
+        pick_pool = None
+
     mapped = vocab_mappings.get(field, {}).get(key)
     if mapped:
-        return _repair_surface_profile(mapped, field, f"{field}::{key}")
+        repaired = _repair_surface_profile(mapped, field, f"{field}::{key}")
+        # In strict mode, if repair fell back to generate_word, prefer a vocab value instead.
+        if _STRICT_VOCAB and pick_pool and repaired not in set(vocab_mappings.get(field, {}).values()):
+            pick = _stable_pick(pick_pool, f"{field}::{key}")
+            if pick:
+                return _repair_surface_profile(pick, field, f"{field}::{key}")
+        return repaired
 
     # Try semantic nearest neighbor among vocabulary keys if embeddings are available.
     emb_pack = _get_vocab_embeddings(field, vocab_mappings)
@@ -822,13 +837,17 @@ def _map_term_to_zyntalic(
             match = keys[best_i]
             mapped = vocab_mappings.get(field, {}).get(match)
             if mapped:
-                return _repair_surface_profile(mapped, field, f"{field}::{key}")
+                repaired = _repair_surface_profile(mapped, field, f"{field}::{key}")
+                if _STRICT_VOCAB and pick_pool and repaired not in set(vocab_mappings.get(field, {}).values()):
+                    pick = _stable_pick(pick_pool, f"{field}::{key}")
+                    if pick:
+                        return _repair_surface_profile(pick, field, f"{field}::{key}")
+                return repaired
         except Exception:
             pass
 
-    if _STRICT_VOCAB:
-        values = list(vocab_mappings.get(field, {}).values())
-        pick = _stable_pick(values, f"{field}::{key}") if values else None
+    if _STRICT_VOCAB and pick_pool:
+        pick = _stable_pick(pick_pool, f"{field}::{key}")
         if pick:
             return _repair_surface_profile(pick, field, f"{field}::{key}")
     return generate_word(f"{field}::{key}")

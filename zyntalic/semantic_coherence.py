@@ -333,7 +333,7 @@ class SemanticCoherenceProcessor:
         try:
             embedding, anchor_weights = generate_embedding(sentence)
             return {anchor: weight for anchor, weight in anchor_weights}
-        except:
+        except Exception:
             return {}
 
     def _update_discourse_context(self, sentence: str, analysis: dict[str, any]):
@@ -342,13 +342,13 @@ class SemanticCoherenceProcessor:
         self.sentence_history.append(sentence)
 
         # Update active semantic fields
-        for field, weight in analysis['semantic_fields'].items():
-            if field in self.discourse_context.active_fields:
+        for sem_field, weight in analysis['semantic_fields'].items():
+            if sem_field in self.discourse_context.active_fields:
                 # Decay previous weight and add new
-                self.discourse_context.active_fields[field] = \
-                    self.discourse_context.active_fields[field] * 0.8 + weight
+                self.discourse_context.active_fields[sem_field] = \
+                    self.discourse_context.active_fields[sem_field] * 0.8 + weight
             else:
-                self.discourse_context.active_fields[field] = weight
+                self.discourse_context.active_fields[sem_field] = weight
 
         # Update active frames
         self.discourse_context.active_frames.update(analysis['active_frames'])
@@ -363,8 +363,8 @@ class SemanticCoherenceProcessor:
         # Aggregate semantic field activations
         field_totals = defaultdict(float)
         for analysis in sentence_analyses:
-            for field, weight in analysis['semantic_fields'].items():
-                field_totals[field] += weight
+            for sem_field, weight in analysis['semantic_fields'].items():
+                field_totals[sem_field] += weight
 
         if not field_totals:
             return None
@@ -389,13 +389,13 @@ class SemanticCoherenceProcessor:
         aggregated = defaultdict(float)
 
         for analysis in sentence_analyses:
-            for field, weight in analysis['semantic_fields'].items():
-                aggregated[field] += weight
+            for sem_field, weight in analysis['semantic_fields'].items():
+                aggregated[sem_field] += weight
 
         # Normalize by number of sentences
         if sentence_analyses:
-            for field in aggregated:
-                aggregated[field] /= len(sentence_analyses)
+            for sem_field in aggregated:
+                aggregated[sem_field] /= len(sentence_analyses)
 
         return dict(aggregated)
 
@@ -550,7 +550,7 @@ class SemanticCoherenceProcessor:
         try:
             embedding, anchor_weights = generate_embedding(text)
             return {anchor: weight for anchor, weight in anchor_weights}
-        except:
+        except Exception:
             return {}
 
     def ensure_translation_coherence(self, english_text: str, zyntalic_translation: str) -> tuple[str, float]:

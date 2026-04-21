@@ -37,8 +37,8 @@ def compose_hangul(initial, vowel, final):
         ti = JONGSEONG.index(final) if final else 0
         base = 0xAC00
         return chr(base + (ci * 21 + vi) * 28 + ti)
-    except:
-        return initial # Fallback if mapping fails
+    except Exception:
+        return initial  # Fallback if mapping fails
 
 # ---------------------------------------------------------
 # 2. LATIN BODY GENERATOR
@@ -60,8 +60,10 @@ def generate_latin_word(text):
 # ---------------------------------------------------------
 LEXICON_CACHE = {}
 def load_lexicons():
-    if LEXICON_CACHE: return
-    if not os.path.exists("lexicon"): return
+    if LEXICON_CACHE:
+        return
+    if not os.path.exists("lexicon"):
+        return
     for f in os.listdir("lexicon"):
         if f.endswith(".json"):
             with open(f"lexicon/{f}", encoding="utf-8") as file:
@@ -75,12 +77,14 @@ def analyze_context_vector(words):
 
     for w in words:
         w = w.lower()
-        if w in ignore: continue
+        if w in ignore:
+            continue
         for anchor, data in LEXICON_CACHE.items():
             if w in data.get("nouns", []) or w in data.get("verbs", []):
                 votes[anchor] += 1
 
-    if not votes: return "Neutral"
+    if not votes:
+        return "Neutral"
     return votes.most_common(1)[0][0]
 
 def generate_mirror_sigil(sentence_text):
@@ -92,7 +96,8 @@ def generate_mirror_sigil(sentence_text):
     rng = random.Random(seed)
     # 1. Split sentence into two halves (Thesis / Antithesis)
     words = re.findall(r'\w+', sentence_text)
-    if not words: return ""
+    if not words:
+        return ""
 
     midpoint = len(words) // 2
     first_half = words[:midpoint]
@@ -131,7 +136,8 @@ def translate_saramago_chiasmus(text):
     print("-" * 60)
 
     for sent in sentences:
-        if not sent.strip(): continue
+        if not sent.strip():
+            continue
 
         # 1. Translate Words (Latin Body)
         raw_words = sent.split()
@@ -149,7 +155,8 @@ def translate_saramago_chiasmus(text):
                 trans_words.append(w)
 
         body = " ".join(trans_words)
-        if body.endswith("."): body = body[:-1]
+        if body.endswith("."):
+            body = body[:-1]
 
         # 2. Generate the Chiasmus Sigil
         sigil, rtype = generate_mirror_sigil(" ".join(clean_text_for_analysis))

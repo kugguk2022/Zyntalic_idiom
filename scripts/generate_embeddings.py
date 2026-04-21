@@ -23,7 +23,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from zyntalic.core import (
+from zyntalic.core import (  # noqa: E402
     ANCHORS,
     create_hangul_syllable,
     create_latin_syllable,
@@ -35,7 +35,7 @@ from zyntalic.core import (
 try:
     from zyntalic.embeddings import embed_text
     HAS_EMBEDDINGS = True
-except:
+except Exception:
     HAS_EMBEDDINGS = False
     print("Warning: sentence-transformers not available. Using deterministic embeddings.")
 

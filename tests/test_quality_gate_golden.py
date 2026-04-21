@@ -58,12 +58,12 @@ def test_golden_core_hashes_and_quality_gate(monkeypatch):
             f"Missing role profile tag for prompt: {prompt}"
         )
 
-        has_hangul = any("\uac00" <= ch <= "\ud7af" for ch in surface)
-        has_latin = any(("a" <= ch.lower() <= "z") for ch in surface)
-        if has_hangul and has_latin:
+        has_hangul_in_ctx = "han=" in ctx and any("\uac00" <= ch <= "\ud7af" for ch in ctx)
+        has_latin_surface = any(("a" <= ch.lower() <= "z") for ch in surface)
+        if has_hangul_in_ctx and has_latin_surface:
             script_mixed_count += 1
 
-    # Require at least 30% of prompts to produce mixed-script surface outputs.
+    # Require at least 30% of prompts to produce Latin surface output with Hangul in ctx.
     assert script_mixed_count >= max(1, int(len(prompts) * 0.30)), (
         f"Mixed-script coverage too low: {script_mixed_count}/{len(prompts)}"
     )

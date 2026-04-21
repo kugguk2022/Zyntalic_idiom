@@ -17,7 +17,7 @@ try:
 except ImportError:
     uvicorn = None
 
-from apps.web.app import app
+from apps.web.app import app  # noqa: E402
 
 REQ_PY_LIBS = {
     "PyPDF2": "PyPDF2 is required for PDF uploads. Install with: python -m pip install PyPDF2",

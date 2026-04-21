@@ -16,16 +16,20 @@ except ImportError:
     PyPDF2 = None
 
 try:
-    import multipart  # type: ignore
+    import multipart  # type: ignore  # noqa: F401
     MULTIPART_INSTALLED = True
 except ImportError:
     MULTIPART_INSTALLED = False
 
 genai = None
 
-from zyntalic.logging_utils import get_logger
-from zyntalic.translator import mirror_readback, translate_text, warm_translation_pipeline
-from zyntalic.utils.cache import (
+from zyntalic.logging_utils import get_logger  # noqa: E402
+from zyntalic.translator import (  # noqa: E402
+    mirror_readback,
+    translate_text,
+    warm_translation_pipeline,
+)
+from zyntalic.utils.cache import (  # noqa: E402
     get_cached_translation,
     init_cache,
     put_cached_translation,

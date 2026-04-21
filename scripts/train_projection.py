@@ -34,7 +34,8 @@ def base_embedding(key: str, dim=300):
     return np.array([rng.random() for _ in range(dim)], dtype=np.float32)
 
 def normalize(v: np.ndarray) -> np.ndarray:
-    n = np.linalg.norm(v) or 1.0; return v / n
+    n = np.linalg.norm(v) or 1.0
+    return v / n
 
 def anchor_vec(tag: str, dim=300):
     rng = random.Random(det_seed(tag))
@@ -154,7 +155,8 @@ def top1_accuracy(W, test_pairs, dim=300, embed_method="hash", anchor_embeddings
         vproj = normalize(vproj)
         sims = A @ vproj
         pred = ANCHORS[int(np.argmax(sims))]
-        correct += int(pred == a); total += 1
+        correct += int(pred == a)
+        total += 1
     return (correct/total) if total else 0.0, total
 
 def main():

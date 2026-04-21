@@ -57,7 +57,7 @@ except ImportError:
     _WN_AVAILABLE = False
 
 try:
-    from zyntalic.core import ANCHORS, _dot, _normalize, anchor_weights_for_vec, base_embedding
+    from zyntalic.core import ANCHORS, anchor_weights_for_vec, base_embedding
     _ZYNTALIC_AVAILABLE = True
 except ImportError:
     _ZYNTALIC_AVAILABLE = False

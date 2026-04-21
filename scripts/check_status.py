@@ -20,7 +20,7 @@ def check_server_running():
         else:
             result = subprocess.run(['lsof', '-ti', ':8001'], capture_output=True, text=True)
             return bool(result.stdout.strip())
-    except:
+    except Exception:
         return False
 
 def check_frontend_built():

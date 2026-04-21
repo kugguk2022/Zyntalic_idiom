@@ -23,7 +23,7 @@ _MODEL_ALIASES = {
     "bge-small": "BAAI/bge-small-en-v1.5",
 }
 
-from . import core
+from . import core  # noqa: E402
 
 
 def get_model():

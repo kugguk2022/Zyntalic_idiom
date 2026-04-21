@@ -32,5 +32,5 @@ def main():
         print(f"→ {row['target']}")
 
 
-+if __name__ == "__main__":
-+    main()
+if __name__ == "__main__":
+    main()

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Quick manual translation check."""
 
 from zyntalic.translator import translate_text
@@ -44,5 +43,5 @@ def main():
     print("=" * 80)
 
 
-+if __name__ == "__main__":
-+    main()
+if __name__ == "__main__":
+    main()

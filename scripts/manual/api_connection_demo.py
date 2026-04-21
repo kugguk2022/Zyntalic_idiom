@@ -2,8 +2,7 @@
 """Manual API connectivity check without pytest."""
 
 import json
-from urllib import request, error
-
+from urllib import error, request
 
 URL = "http://127.0.0.1:8001/translate"
 DATA = {
@@ -35,5 +34,5 @@ def main():
         print(f"❌ ERROR: {exc}")
 
 
-+if __name__ == "__main__":
-+    main()
+if __name__ == "__main__":
+    main()
