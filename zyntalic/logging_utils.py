@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Logging helpers for consistent output across modules."""
 
 from __future__ import annotations

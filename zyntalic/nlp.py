@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Optional NLP backend utilities (sentence splitting, tokenization, lemmatization).
 
@@ -8,10 +7,9 @@ regex implementation to keep the core deterministic and dependency-light.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
-from typing import Dict, List, Optional
-import logging
 
 logger = logging.getLogger("zyntalic.nlp")
 
@@ -66,7 +64,7 @@ def backend_name() -> str:
     return _BACKEND or "fallback"
 
 
-def split_sentences(text: str) -> List[str]:
+def split_sentences(text: str) -> list[str]:
     _ensure_backend()
     if not text:
         return []
@@ -78,7 +76,7 @@ def split_sentences(text: str) -> List[str]:
     return [s.strip() for s in _SENT_SPLIT_FALLBACK.split(text) if s.strip()]
 
 
-def analyze_tokens(text: str) -> List[Dict[str, str]]:
+def analyze_tokens(text: str) -> list[dict[str, str]]:
     _ensure_backend()
     if not text:
         return []

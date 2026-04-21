@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 High-level translation API.
 
@@ -14,11 +13,8 @@ import hashlib
 import json
 import os
 import re
-from typing import Dict, List, Optional
 
-from . import core
-from . import nlp
-from . import syntax
+from . import core, nlp, syntax
 from .chiasmus import generate_mirror_sigil
 from .ir import Frame, PivotType, SentenceSidecar
 from .utils.rng import get_rng
@@ -80,7 +76,7 @@ def warm_translation_pipeline() -> None:
 def mirror_readback(
     seed_text: str,
     anchors,
-    mirror_terms: Optional[List[Dict[str, str]]] = None,
+    mirror_terms: list[dict[str, str]] | None = None,
     *,
     fallback_to_semantic: bool = True,
 ):
@@ -112,7 +108,7 @@ def mirror_readback(
         return None
 
 
-def _normalize_scope_config(config: Optional[Dict]) -> Dict[str, str]:
+def _normalize_scope_config(config: dict | None) -> dict[str, str]:
     normalized = dict(_SCOPE_DEFAULTS)
     if not config:
         return normalized
@@ -136,7 +132,7 @@ def _normalize_scope_config(config: Optional[Dict]) -> Dict[str, str]:
     return normalized
 
 
-def _normalize_anchor_mode(config: Optional[Dict]) -> str:
+def _normalize_anchor_mode(config: dict | None) -> str:
     if not config:
         return _ANCHOR_MODE_DEFAULT
     value = config.get("anchor_mode", _ANCHOR_MODE_DEFAULT)
@@ -147,8 +143,8 @@ def _normalize_anchor_mode(config: Optional[Dict]) -> str:
     return value if value in _ANCHOR_MODES else _ANCHOR_MODE_DEFAULT
 
 
-def _normalize_selected_anchors(config: Optional[Dict]) -> List[str]:
-    selected: List[str] = []
+def _normalize_selected_anchors(config: dict | None) -> list[str]:
+    selected: list[str] = []
     raw = (config or {}).get("selected_anchors", [])
     if isinstance(raw, (list, tuple)):
         for item in raw:
@@ -165,11 +161,11 @@ def _normalize_selected_anchors(config: Optional[Dict]) -> List[str]:
     return selected
 
 
-def _requested_frame_names(config: Optional[Dict]) -> List[str]:
+def _requested_frame_names(config: dict | None) -> list[str]:
     return _normalize_selected_anchors(config)[:2]
 
 
-def _requested_anchor_weights(config: Optional[Dict]) -> Optional[List[tuple[str, float]]]:
+def _requested_anchor_weights(config: dict | None) -> list[tuple[str, float]] | None:
     anchor_mode = _normalize_anchor_mode(config)
     selected = _normalize_selected_anchors(config)
 
@@ -180,7 +176,7 @@ def _requested_anchor_weights(config: Optional[Dict]) -> Optional[List[tuple[str
     if not selected:
         return None
 
-    seen: List[str] = []
+    seen: list[str] = []
     for name in selected:
         if name not in seen:
             seen.append(name)
@@ -192,8 +188,8 @@ def _requested_anchor_weights(config: Optional[Dict]) -> Optional[List[tuple[str
     return [(name, weight) for name in seen]
 
 
-def _coerce_anchor_pairs(raw) -> List[tuple[str, float]]:
-    pairs: List[tuple[str, float]] = []
+def _coerce_anchor_pairs(raw) -> list[tuple[str, float]]:
+    pairs: list[tuple[str, float]] = []
     for item in raw or []:
         if isinstance(item, (list, tuple)) and len(item) >= 2:
             name, weight = item[0], item[1]
@@ -211,12 +207,12 @@ def _coerce_anchor_pairs(raw) -> List[tuple[str, float]]:
     return pairs
 
 
-def _collect_anchor_weights(source: str, row: Dict, config: Optional[Dict]) -> List[tuple[str, float]]:
+def _collect_anchor_weights(source: str, row: dict, config: dict | None) -> list[tuple[str, float]]:
     anchor_mode = _normalize_anchor_mode(config)
     requested_names = _normalize_selected_anchors(config)
     requested_weights = _requested_anchor_weights(config) or []
     lookup_k = len(core.ANCHORS) if requested_names else 5
-    weights: List[tuple[str, float]] = []
+    weights: list[tuple[str, float]] = []
 
     row_weights = _coerce_anchor_pairs(row.get("anchors"))
     if anchor_mode == "neutral":
@@ -254,7 +250,7 @@ def _collect_anchor_weights(source: str, row: Dict, config: Optional[Dict]) -> L
     return weights[:lookup_k]
 
 
-def _extract_sigil(text: str) -> tuple[Optional[str], Optional[str]]:
+def _extract_sigil(text: str) -> tuple[str | None, str | None]:
     try:
         sigil_data = generate_mirror_sigil(text)
     except Exception:
@@ -268,7 +264,7 @@ def _extract_sigil(text: str) -> tuple[Optional[str], Optional[str]]:
     return None, None
 
 
-def _scope_signature(config: Optional[Dict], anchor_weights: List[tuple[str, float]]) -> str:
+def _scope_signature(config: dict | None, anchor_weights: list[tuple[str, float]]) -> str:
     normalized = _normalize_scope_config(config)
     payload_data = dict(normalized)
     payload_data["anchor_mode"] = _normalize_anchor_mode(config)
@@ -282,7 +278,7 @@ def _scope_signature(config: Optional[Dict], anchor_weights: List[tuple[str, flo
     return f"{anchor_blob}-{digest}"
 
 
-def _resolve_pivot(frames: List[Frame]) -> PivotType:
+def _resolve_pivot(frames: list[Frame]) -> PivotType:
     if len(frames) >= 2:
         delta = abs(frames[0].weight - frames[1].weight)
         return PivotType.CONVERGE if delta <= 0.08 else PivotType.DIVERGE
@@ -291,7 +287,7 @@ def _resolve_pivot(frames: List[Frame]) -> PivotType:
     return PivotType.NEUTRAL
 
 
-def _token_sidecar(source: str) -> Optional[List[Dict[str, object]]]:
+def _token_sidecar(source: str) -> list[dict[str, object]] | None:
     tokens = []
     for token in nlp.analyze_tokens(source):
         surface = (token.get("text") or "").strip()
@@ -308,7 +304,7 @@ def _token_sidecar(source: str) -> Optional[List[Dict[str, object]]]:
     return tokens or None
 
 
-def _split_context_tail(text: str) -> tuple[str, Optional[str]]:
+def _split_context_tail(text: str) -> tuple[str, str | None]:
     if not text:
         return "", None
     marker = "⟦ctx:"
@@ -318,11 +314,11 @@ def _split_context_tail(text: str) -> tuple[str, Optional[str]]:
     return head.rstrip(), f"{marker}{tail.strip()}"
 
 
-def _merge_context_tail(ctx_tail: Optional[str], updates: Dict[str, str]) -> Optional[str]:
+def _merge_context_tail(ctx_tail: str | None, updates: dict[str, str]) -> str | None:
     if not updates and not ctx_tail:
         return None
 
-    parts: List[str] = []
+    parts: list[str] = []
     if ctx_tail and ctx_tail.startswith("⟦ctx:") and ctx_tail.endswith("⟧"):
         inner = ctx_tail[len("⟦ctx:"):-1].strip()
         parts = [item.strip() for item in inner.split(";") if item.strip()]
@@ -340,7 +336,7 @@ def _merge_context_tail(ctx_tail: Optional[str], updates: Dict[str, str]) -> Opt
     return f"⟦ctx:{'; '.join(parts)}⟧" if parts else None
 
 
-def _compose_target(surface: str, ctx_tail: Optional[str]) -> str:
+def _compose_target(surface: str, ctx_tail: str | None) -> str:
     surface = (surface or "").strip()
     if not ctx_tail:
         return surface
@@ -354,7 +350,7 @@ def _minimal_context_tail(seed_text: str) -> str:
     return f"⟦ctx:han={core.make_korean_tail(seed)}⟧"
 
 
-def _grammar_scope_updates(source: str) -> Dict[str, str]:
+def _grammar_scope_updates(source: str) -> dict[str, str]:
     """Build deterministic grammar metadata tags from parsed source text."""
     try:
         parsed = syntax.to_zyntalic_order(source or "")
@@ -372,8 +368,8 @@ def _grammar_scope_updates(source: str) -> Dict[str, str]:
     }
 
 
-def _parse_context_fields(ctx_tail: Optional[str]) -> Dict[str, str]:
-    fields: Dict[str, str] = {}
+def _parse_context_fields(ctx_tail: str | None) -> dict[str, str]:
+    fields: dict[str, str] = {}
     if not ctx_tail or not ctx_tail.startswith("⟦ctx:") or not ctx_tail.endswith("⟧"):
         return fields
     inner = ctx_tail[len("⟦ctx:"):-1].strip()
@@ -421,9 +417,9 @@ def _enforce_target_rules(target: str, source: str, engine: str) -> str:
     return _compose_target(surface, ctx_tail)
 
 
-def _validate_target_rules(target: str, engine: str) -> List[str]:
+def _validate_target_rules(target: str, engine: str) -> list[str]:
     """Return non-fatal rule warnings for observability/debugging."""
-    warnings: List[str] = []
+    warnings: list[str] = []
     normalized = (target or "").strip()
     ctx_count = normalized.count("⟦ctx:")
 
@@ -477,11 +473,11 @@ def _apply_dialect_surface(surface: str, dialect: str) -> str:
     return modified
 
 
-def _context_scope_updates(config: Optional[Dict]) -> Dict[str, str]:
+def _context_scope_updates(config: dict | None) -> dict[str, str]:
     normalized = _normalize_scope_config(config)
     anchor_mode = _normalize_anchor_mode(config)
     selected_anchors = _normalize_selected_anchors(config)
-    updates: Dict[str, str] = {}
+    updates: dict[str, str] = {}
     if normalized["evidentiality"] != _SCOPE_DEFAULTS["evidentiality"]:
         updates["evidentiality"] = normalized["evidentiality"]
     if normalized["register"] != _SCOPE_DEFAULTS["register"]:
@@ -501,7 +497,7 @@ def _context_scope_updates(config: Optional[Dict]) -> Dict[str, str]:
     return updates
 
 
-def _apply_requested_scope(target: str, source: str, config: Optional[Dict], engine: str) -> str:
+def _apply_requested_scope(target: str, source: str, config: dict | None, engine: str) -> str:
     if not target or engine == "reverse":
         return target
 
@@ -516,13 +512,13 @@ def _apply_requested_scope(target: str, source: str, config: Optional[Dict], eng
     return _compose_target(surface, ctx_tail)
 
 
-def build_sentence_sidecar(source: str, row: Dict, config: Optional[Dict] = None) -> SentenceSidecar:
+def build_sentence_sidecar(source: str, row: dict, config: dict | None = None) -> SentenceSidecar:
     anchor_mode = _normalize_anchor_mode(config)
     selected_anchors = _normalize_selected_anchors(config)
     anchor_weights = _collect_anchor_weights(source, row, config)
     weight_map = {name: weight for name, weight in anchor_weights}
     normalized = _normalize_scope_config(config)
-    frames: List[Frame] = []
+    frames: list[Frame] = []
     if anchor_mode != "neutral":
         for index, anchor in enumerate(selected_anchors[:2]):
             frames.append(Frame(id="AB"[index], anchor=anchor, weight=weight_map.get(anchor, 0.0)))
@@ -547,7 +543,7 @@ def build_sentence_sidecar(source: str, row: Dict, config: Optional[Dict] = None
     )
 
 
-def _attach_sidecar(row: Dict, source: str, config: Optional[Dict]) -> Dict:
+def _attach_sidecar(row: dict, source: str, config: dict | None) -> dict:
     engine = str(row.get("engine") or "")
     scoped_target = _apply_requested_scope(
         row.get("target", ""),
@@ -582,7 +578,7 @@ def _canonical_seed(text: str) -> str:
     if not normalized:
         return ""
 
-    lemmas: List[str] = []
+    lemmas: list[str] = []
     for token in nlp.analyze_tokens(normalized):
         lemma = (token.get("lemma") or token.get("text") or "").strip().lower()
         if not lemma or not re.search(r"[a-z0-9]", lemma):
@@ -603,7 +599,7 @@ def _batch_max_chars() -> int:
     except Exception:
         return 400
 
-def _split_into_batches(text: str, max_chars: int) -> List[str]:
+def _split_into_batches(text: str, max_chars: int) -> list[str]:
     if max_chars <= 0:
         return [text] if text else []
     s = (text or "").strip()
@@ -621,14 +617,14 @@ def _split_into_batches(text: str, max_chars: int) -> List[str]:
         r",\s",
     )
     min_size = max(40, int(max_chars * 0.5))
-    chunks: List[str] = []
+    chunks: list[str] = []
 
     while s:
         if len(s) <= max_chars:
             chunks.append(s.strip())
             break
         window = s[: max_chars + 1]
-        candidates: List[int] = []
+        candidates: list[int] = []
         for pattern in boundary_patterns:
             for m in re.finditer(pattern, window):
                 candidates.append(m.end())
@@ -648,13 +644,13 @@ def _split_into_batches(text: str, max_chars: int) -> List[str]:
     return chunks
 
 
-def _extract_mirror_terms(text: str) -> List[Dict[str, str]]:
+def _extract_mirror_terms(text: str) -> list[dict[str, str]]:
     vocab = core.load_vocabulary_mappings()
     noun_keys = set(vocab.get("nouns", {}).keys())
     verb_keys = set(vocab.get("verbs", {}).keys())
     adj_keys = set(vocab.get("adjectives", {}).keys())
     stop = {"the", "and", "of", "to", "in", "a", "an", "is", "are", "was", "were"}
-    terms: List[Dict[str, str]] = []
+    terms: list[dict[str, str]] = []
     seen = set()
     for tok in nlp.analyze_tokens(text):
         lemma = (tok.get("lemma") or tok.get("text") or "").lower()
@@ -690,9 +686,9 @@ def translate_sentence(
     mirror_rate: float = 0.3,  # Lower value = more Zyntalic vocabulary
     engine: str = "core",
     W=None,
-    mirror_state: Optional[core.MirrorState] = None,
-    config: Optional[Dict] = None,
-) -> Dict:
+    mirror_state: core.MirrorState | None = None,
+    config: dict | None = None,
+) -> dict:
     """
     Translate a single sentence to a structured record.
 
@@ -714,7 +710,7 @@ def translate_sentence(
         try:
             from .test_suite import ZyntalicTestSuite
             # Run a quick validation test for the input
-            test_suite = ZyntalicTestSuite()
+            ZyntalicTestSuite()
             # Use core engine for actual translation but add test metadata
             entry = core.generate_entry(
                 seed_text,
@@ -741,7 +737,7 @@ def translate_sentence(
                     fallback_to_semantic=allow_inferred_anchors,
                 )
             return _attach_sidecar(row, src, config)
-        except Exception as e:
+        except Exception:
             # Fall back to core if test suite fails
             engine = "core"
 
@@ -796,7 +792,7 @@ def translate_sentence(
                     fallback_to_semantic=allow_inferred_anchors,
                 )
             return _attach_sidecar(row, src, config)
-        except Exception as e:
+        except Exception:
             # print(f"Transformer error: {e}") # debug
             engine = "core"
 
@@ -856,8 +852,8 @@ def translate_text(
     mirror_rate: float = 0.8,
     engine: str = "core",
     W=None,
-    config: Optional[Dict] = None,
-) -> List[Dict]:
+    config: dict | None = None,
+) -> list[dict]:
     """
     Translate multi-sentence text into a list of records.
     """
@@ -866,7 +862,7 @@ def translate_text(
     if not text:
         return []
     max_chars = _batch_max_chars()
-    parts: List[str] = []
+    parts: list[str] = []
     for batch in _split_into_batches(text, max_chars):
         parts.extend(nlp.split_sentences(batch))
     mirror_state = core.MirrorState()
@@ -888,20 +884,20 @@ def translate_text(
 
 
 def translate_batch(
-    texts: List[str],
+    texts: list[str],
     *,
     mirror_rate: float = 0.8,
     engine: str = "core",
     W=None,
     flatten: bool = False,
-    config: Optional[Dict] = None,
-) -> List:
+    config: dict | None = None,
+) -> list:
     """Translate a batch of texts efficiently.
 
     If flatten=True, returns a single flat list of rows; otherwise a list of lists.
     """
     _ensure_warm()
-    results: List[List[Dict]] = []
+    results: list[list[dict]] = []
     for text in texts:
         rows = translate_text(text, mirror_rate=mirror_rate, engine=engine, W=W, config=config)
         results.append(rows)

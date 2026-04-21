@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -11,7 +11,7 @@ class Frame:
     anchor: str
     weight: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "anchor": self.anchor,
@@ -27,20 +27,20 @@ class PivotType(str, Enum):
 
 @dataclass
 class SentenceSidecar:
-    frames: List[Frame] = field(default_factory=list)
+    frames: list[Frame] = field(default_factory=list)
     pivot: PivotType = PivotType.NEUTRAL
-    anchor_weights: List[Tuple[str, float]] = field(default_factory=list)
-    anchor_mode: Optional[str] = None
-    selected_anchors: List[str] = field(default_factory=list)
-    sigil: Optional[str] = None
-    sigil_type: Optional[str] = None
-    evidentiality: Optional[str] = None
-    register: Optional[str] = None
-    dialect: Optional[str] = None
-    scope_signature: Optional[str] = None
-    tokens: Optional[List[Dict[str, Any]]] = None
+    anchor_weights: list[tuple[str, float]] = field(default_factory=list)
+    anchor_mode: str | None = None
+    selected_anchors: list[str] = field(default_factory=list)
+    sigil: str | None = None
+    sigil_type: str | None = None
+    evidentiality: str | None = None
+    register: str | None = None
+    dialect: str | None = None
+    scope_signature: str | None = None
+    tokens: list[dict[str, Any]] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "frames": [frame.to_dict() for frame in self.frames],
             "pivot": self.pivot.value,
@@ -60,7 +60,7 @@ class SentenceSidecar:
         }
 
     def to_legacy_str(self) -> str:
-        parts: List[str] = [f"pivot={self.pivot.value}"]
+        parts: list[str] = [f"pivot={self.pivot.value}"]
         if self.frames:
             frame_blob = "|".join(
                 f"{frame.id}:{frame.anchor}:{frame.weight:.3f}" for frame in self.frames

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Build a dictionary from a sentence corpus by translating unique tokens.
 """
@@ -10,8 +9,8 @@ import argparse
 import json
 import re
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable
 
 try:
     import requests
@@ -21,7 +20,7 @@ except Exception:
 _TOKEN = re.compile(r"[A-Za-z][A-Za-z'\-]+")
 
 
-def iter_jsonl(path: Path) -> Iterable[Dict]:
+def iter_jsonl(path: Path) -> Iterable[dict]:
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -30,13 +29,13 @@ def iter_jsonl(path: Path) -> Iterable[Dict]:
             yield json.loads(line)
 
 
-def translate_word_api(word: str, mirror_rate: float, engine: str) -> Dict:
+def translate_word_api(word: str, mirror_rate: float, engine: str) -> dict:
     from zyntalic import translator
     row = translator.translate_sentence(word, mirror_rate=mirror_rate, engine=engine)
     return row
 
 
-def translate_word_server(word: str, mirror_rate: float, engine: str, url: str) -> Dict:
+def translate_word_server(word: str, mirror_rate: float, engine: str, url: str) -> dict:
     if requests is None:
         raise SystemExit("requests not available. Install with: pip install -e .[data]")
     payload = {"text": word, "mirror_rate": mirror_rate, "engine": engine}

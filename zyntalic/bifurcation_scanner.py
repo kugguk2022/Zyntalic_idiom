@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 bifurcation_scanner.py
 ----------------------
@@ -28,11 +27,9 @@ Or import directly:
 from __future__ import annotations
 
 import argparse
-import math
-import sys
 import os
+import sys
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Resolve repo root so we can import zyntalic regardless of cwd
@@ -53,14 +50,14 @@ except ImportError:
     _SPACY_AVAILABLE = False
 
 try:
-    from nltk.corpus import wordnet as wn  # type: ignore
     import nltk
+    from nltk.corpus import wordnet as wn  # type: ignore
     _WN_AVAILABLE = True
 except ImportError:
     _WN_AVAILABLE = False
 
 try:
-    from zyntalic.core import base_embedding, anchor_weights_for_vec, _normalize, _dot, ANCHORS
+    from zyntalic.core import ANCHORS, _dot, _normalize, anchor_weights_for_vec, base_embedding
     _ZYNTALIC_AVAILABLE = True
 except ImportError:
     _ZYNTALIC_AVAILABLE = False
@@ -78,7 +75,7 @@ class LemmaScore:
     interference: float        # 1 - |a - b|  — 1.0 = perfect split
     has_duality: bool          # verb with both agentive + experiential uses
     combined: float            # final ranking score
-    example_sentences: List[str]  # up to 3 sentences from seed text
+    example_sentences: list[str]  # up to 3 sentences from seed text
 
     def __str__(self) -> str:
         dual_mark = " [dual]" if self.has_duality else ""
@@ -195,7 +192,7 @@ def _interference_score(
     frame_a: str,
     frame_b: str,
     dim: int = 300,
-) -> Tuple[float, float, float]:
+) -> tuple[float, float, float]:
     """
     Returns (weight_a, weight_b, interference).
     interference = 1 - |weight_a - weight_b|
@@ -280,11 +277,11 @@ def scan_bifurcators(
     frame_a: str,
     frame_b: str,
     top_k: int = 20,
-    pos_filter: Optional[List[str]] = None,
+    pos_filter: list[str] | None = None,
     min_interference: float = 0.6,
     dim: int = 300,
     verbose: bool = False,
-) -> List[LemmaScore]:
+) -> list[LemmaScore]:
     """
     Scan a seed text for lemmas that work as neutral bifurcators
     between frame_a and frame_b.
@@ -336,7 +333,7 @@ def scan_bifurcators(
             nltk.download("omw-1.4", quiet=True)
 
     # Step 3: score each lemma
-    results: List[LemmaScore] = []
+    results: list[LemmaScore] = []
     total = len(lemma_map)
 
     for i, (lemma, meta) in enumerate(lemma_map.items()):
@@ -388,7 +385,7 @@ def scan_bifurcators(
 # Output formatters
 # ---------------------------------------------------------------------------
 
-def print_results(results: List[LemmaScore], show_sentences: bool = False) -> None:
+def print_results(results: list[LemmaScore], show_sentences: bool = False) -> None:
     if not results:
         print("No bifurcators found above threshold.")
         return
@@ -420,7 +417,7 @@ def print_results(results: List[LemmaScore], show_sentences: bool = False) -> No
         print("  " + ", ".join(r.lemma for r in neutral_nouns[:10]))
 
 
-def export_json(results: List[LemmaScore], path: str) -> None:
+def export_json(results: list[LemmaScore], path: str) -> None:
     import json
     data = [
         {
@@ -494,7 +491,7 @@ def main() -> None:
 
     # Read seed text
     try:
-        with open(args.text, "r", encoding="utf-8", errors="replace") as f:
+        with open(args.text, encoding="utf-8", errors="replace") as f:
             text = f.read()
     except FileNotFoundError:
         print(f"Error: file not found: {args.text}", file=sys.stderr)

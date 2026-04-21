@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Collect Project Gutenberg texts.
 
@@ -15,8 +14,8 @@ from __future__ import annotations
 import argparse
 import re
 import time
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List, Optional
 from urllib.parse import urlparse
 
 try:
@@ -39,10 +38,10 @@ _START_RE = re.compile(r"\*\*\*\s*START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK"
 _END_RE = re.compile(r"\*\*\*\s*END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK", re.IGNORECASE)
 
 
-def read_lines(path: Path) -> List[str]:
+def read_lines(path: Path) -> list[str]:
     if not path.exists():
         return []
-    lines: List[str] = []
+    lines: list[str] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -51,7 +50,7 @@ def read_lines(path: Path) -> List[str]:
     return lines
 
 
-def candidate_text_urls(book_id: str) -> List[str]:
+def candidate_text_urls(book_id: str) -> list[str]:
     return [
         f"https://www.gutenberg.org/cache/epub/{book_id}/pg{book_id}.txt",
         f"https://www.gutenberg.org/files/{book_id}/{book_id}-0.txt",
@@ -59,7 +58,7 @@ def candidate_text_urls(book_id: str) -> List[str]:
     ]
 
 
-def find_plain_text_link(page_url: str) -> Optional[str]:
+def find_plain_text_link(page_url: str) -> str | None:
     try:
         resp = requests.get(page_url, timeout=30)
         resp.raise_for_status()
@@ -103,7 +102,7 @@ def strip_gutenberg_boilerplate(text: str) -> str:
     return text
 
 
-def download_text(urls: Iterable[str]) -> Optional[str]:
+def download_text(urls: Iterable[str]) -> str | None:
     for url in urls:
         try:
             resp = requests.get(url, timeout=60)

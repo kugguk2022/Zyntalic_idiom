@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import hashlib
 import random
+
 
 def stable_seed(seed: str) -> int:
     """

@@ -1,11 +1,16 @@
-# -*- coding: utf-8 -*-
 """
 Train thin projection W mapping Base -> Anchor centroids.
 Outputs: models/W.npy, models/meta.json
 """
-import argparse, os, json, random, numpy as np
-from collections import defaultdict
+import argparse
 import hashlib
+import json
+import os
+import random
+from collections import defaultdict
+
+import numpy as np
+
 from zyntalic.logging_utils import get_logger
 
 logger = get_logger("zyntalic.train_projection")
@@ -32,7 +37,7 @@ def normalize(v: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(v) or 1.0; return v / n
 
 def anchor_vec(tag: str, dim=300):
-    rng = random.Random(det_seed(tag)); 
+    rng = random.Random(det_seed(tag))
     return np.array([rng.random() for _ in range(dim)], dtype=np.float32)
 
 try:  # optional sentence-transformers backend
@@ -60,20 +65,20 @@ def text_embedding(text: str, dim: int, method: str) -> np.ndarray:
 
 def load_anchors_tsv(path: str):
     rows = []
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if not line or line.startswith("#"): 
+            if not line or line.startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) < 2: 
+            if len(parts) < 2:
                 continue
             rows.append((parts[0], parts[1]))
     return rows
 
 def load_pairs_jsonl(path: str):
     rows = []
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -87,7 +92,7 @@ def load_pairs_jsonl(path: str):
     return rows
 
 def load_anchor_embeddings(path: str):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     out = {}
     for k, v in data.items():

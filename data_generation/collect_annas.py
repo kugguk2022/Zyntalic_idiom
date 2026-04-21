@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Collect texts from user-provided URLs (e.g., Anna's Archive pages or direct links).
 
@@ -14,7 +13,6 @@ import argparse
 import re
 import time
 from pathlib import Path
-from typing import Iterable, List, Optional
 from urllib.parse import urlparse
 
 try:
@@ -33,10 +31,10 @@ except Exception as exc:  # pragma: no cover - runtime guard
     raise SystemExit("Missing dependency: tqdm. Install with: pip install -e .[data]") from exc
 
 
-def read_lines(path: Path) -> List[str]:
+def read_lines(path: Path) -> list[str]:
     if not path.exists():
         return []
-    lines: List[str] = []
+    lines: list[str] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -45,7 +43,7 @@ def read_lines(path: Path) -> List[str]:
     return lines
 
 
-def pick_download_link(page_url: str) -> Optional[str]:
+def pick_download_link(page_url: str) -> str | None:
     try:
         resp = requests.get(page_url, timeout=30)
         resp.raise_for_status()
@@ -71,7 +69,7 @@ def pick_download_link(page_url: str) -> Optional[str]:
     return link
 
 
-def download_url(url: str) -> Optional[bytes]:
+def download_url(url: str) -> bytes | None:
     try:
         resp = requests.get(url, timeout=60)
         if resp.status_code == 200 and resp.content:

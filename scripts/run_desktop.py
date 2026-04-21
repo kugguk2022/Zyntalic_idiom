@@ -1,10 +1,10 @@
 import os
+import platform
+import socket
 import sys
 import threading
 import time
 import webbrowser
-import socket
-import platform
 from pathlib import Path
 
 # Ensure repo root is on sys.path so we can import apps/zyntalic

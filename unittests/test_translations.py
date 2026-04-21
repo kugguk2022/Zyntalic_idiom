@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Quick test of Zyntalic translations with new embeddings."""
 
 from zyntalic.translator import translate_text
@@ -19,7 +18,7 @@ print("=" * 80)
 for text, mirror_rate in test_data:
     result = translate_text(text, mirror_rate=mirror_rate, engine='core')[0]
     target = result["target"]
-    
+
     # Extract just the Zyntalic text (before the context block)
     if "⟦ctx:" in target:
         zyntalic_only = target.split("⟦ctx:")[0].strip()
@@ -30,11 +29,11 @@ for text, mirror_rate in test_data:
     else:
         zyntalic_only = target
         han_value = "N/A"
-    
+
     print(f"\n📝 English:  {text} (mirror_rate={mirror_rate})")
     print(f"🌀 Zyntalic: {zyntalic_only}")
     print(f"🔤 Context:  han={han_value}")
-    
+
     # Show if it contains Hangul and Polish
     has_hangul = any('\uac00' <= c <= '\ud7af' for c in zyntalic_only)
     has_polish = any(c in 'ąćęłńóśźżĄĆĘŁŃÓŚŹŻ' for c in zyntalic_only)

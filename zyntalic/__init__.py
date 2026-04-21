@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Zyntalic — a deterministic synthetic-language toolkit.
 

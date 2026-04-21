@@ -1,5 +1,6 @@
-import requests
 import json
+
+import requests
 
 print("=" * 70)
 print("Testing Zyntalic API Connection")
@@ -15,10 +16,10 @@ data = {
 try:
     print(f"\nSending request to: {url}")
     print(f"Data: {json.dumps(data, indent=2)}\n")
-    
+
     response = requests.post(url, json=data, timeout=10)
     response.raise_for_status()
-    
+
     result = response.json()
     print("✅ API Connection Successful!\n")
     print("Response:")
@@ -27,13 +28,13 @@ try:
     print("\n" + "=" * 70)
     print("The frontend should now show:")
     print("=" * 70)
-    
+
     for row in result.get('rows', []):
         print(f"\n[{row.get('source', 'N/A')}]")
         print(f"→ {row.get('target', 'N/A')}")
-    
+
     print("\n✅ Server is working correctly!")
-    
+
 except requests.exceptions.ConnectionError:
     print("❌ ERROR: Cannot connect to server at http://127.0.0.1:8001")
     print("   Make sure the server is running: python -m run_desktop")

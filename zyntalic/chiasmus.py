@@ -1,8 +1,8 @@
-import re
-import random
 import hashlib
-import os
 import json
+import os
+import random
+import re
 from collections import Counter
 
 # ---------------------------------------------------------
@@ -64,7 +64,7 @@ def load_lexicons():
     if not os.path.exists("lexicon"): return
     for f in os.listdir("lexicon"):
         if f.endswith(".json"):
-            with open(f"lexicon/{f}", "r", encoding="utf-8") as file:
+            with open(f"lexicon/{f}", encoding="utf-8") as file:
                 LEXICON_CACHE[f.replace(".json", "")] = json.load(file)
 
 def analyze_context_vector(words):
@@ -72,14 +72,14 @@ def analyze_context_vector(words):
     load_lexicons()
     votes = Counter()
     ignore = {"the","and","is","of","to","in","but","not"}
-    
+
     for w in words:
         w = w.lower()
         if w in ignore: continue
         for anchor, data in LEXICON_CACHE.items():
             if w in data.get("nouns", []) or w in data.get("verbs", []):
                 votes[anchor] += 1
-    
+
     if not votes: return "Neutral"
     return votes.most_common(1)[0][0]
 
@@ -93,19 +93,19 @@ def generate_mirror_sigil(sentence_text):
     # 1. Split sentence into two halves (Thesis / Antithesis)
     words = re.findall(r'\w+', sentence_text)
     if not words: return ""
-    
+
     midpoint = len(words) // 2
     first_half = words[:midpoint]
     second_half = words[midpoint:]
-    
+
     # 2. Analyze both halves
     context_A = analyze_context_vector(first_half)
     context_B = analyze_context_vector(second_half)
-    
+
     # 3. Get Semantic Consonants
     cons_A = get_anchor_consonant(context_A) # Thesis (Top)
     cons_B = get_anchor_consonant(context_B) # Antithesis (Bottom)
-    
+
     # 4. Determine Relationship (The Vowel)
     if context_A == context_B:
         # Pure Reflection / Continuation (Horizontal Vowel)
@@ -115,7 +115,7 @@ def generate_mirror_sigil(sentence_text):
         # Irony / Conflict / Shift (Vertical Vowel)
         vowel = rng.choice(VOWEL_CONFLICT)
         rel_type = "Irony"
-        
+
     # 5. Build the Sigil
     sigil = compose_hangul(cons_A, vowel, cons_B)
     return sigil, rel_type
@@ -126,18 +126,18 @@ def generate_mirror_sigil(sentence_text):
 def translate_saramago_chiasmus(text):
     sentences = re.split(r'(?<=[.!?])\s+', text)
     output = []
-    
+
     print(f"{'SIGIL':<5} | {'TYPE':<12} | {'SENTENCE'}")
     print("-" * 60)
 
     for sent in sentences:
         if not sent.strip(): continue
-        
+
         # 1. Translate Words (Latin Body)
         raw_words = sent.split()
         trans_words = []
         clean_text_for_analysis = []
-        
+
         for w in raw_words:
             clean = "".join(filter(str.isalpha, w))
             clean_text_for_analysis.append(clean)
@@ -147,17 +147,17 @@ def translate_saramago_chiasmus(text):
                 trans_words.append(tw + punct)
             else:
                 trans_words.append(w)
-                
+
         body = " ".join(trans_words)
         if body.endswith("."): body = body[:-1]
-        
+
         # 2. Generate the Chiasmus Sigil
         sigil, rtype = generate_mirror_sigil(" ".join(clean_text_for_analysis))
-        
+
         # 3. Append
         final = f"{body} {sigil}"
         output.append(final)
-        
+
         print(f"{sigil:<5} | {rtype:<12} | {sent[:40]}...")
 
     return " ".join(output)
@@ -170,9 +170,9 @@ if __name__ == "__main__":
     Love is the law, love is the bond.
     The king became a beggar.
     """
-    
+
     print("\n--- PROCESSING ---")
     res = translate_saramago_chiasmus(text)
-    
+
     print("\n--- FINAL TEXT ---")
     print(res)

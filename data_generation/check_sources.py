@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Lightweight connectivity checks for optional data sources.
 
@@ -9,9 +8,7 @@ This does not download full content; it only verifies that URLs/IDs respond.
 from __future__ import annotations
 
 import argparse
-import re
 from pathlib import Path
-from typing import List, Optional
 from urllib.parse import urlparse
 
 try:
@@ -25,10 +22,10 @@ except Exception as exc:  # pragma: no cover - runtime guard
     raise SystemExit("Missing dependency: beautifulsoup4. Install with: pip install -e .[data]") from exc
 
 
-def read_lines(path: Path) -> List[str]:
+def read_lines(path: Path) -> list[str]:
     if not path.exists():
         return []
-    lines: List[str] = []
+    lines: list[str] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -37,7 +34,7 @@ def read_lines(path: Path) -> List[str]:
     return lines
 
 
-def candidate_text_urls(book_id: str) -> List[str]:
+def candidate_text_urls(book_id: str) -> list[str]:
     return [
         f"https://www.gutenberg.org/cache/epub/{book_id}/pg{book_id}.txt",
         f"https://www.gutenberg.org/files/{book_id}/{book_id}-0.txt",
@@ -56,7 +53,7 @@ def ok_url(url: str, timeout: int) -> bool:
         return False
 
 
-def find_plain_text_link(page_url: str, timeout: int) -> Optional[str]:
+def find_plain_text_link(page_url: str, timeout: int) -> str | None:
     try:
         resp = requests.get(page_url, timeout=timeout)
         resp.raise_for_status()
@@ -85,7 +82,7 @@ def find_plain_text_link(page_url: str, timeout: int) -> Optional[str]:
     return link
 
 
-def pick_download_link(page_url: str, timeout: int) -> Optional[str]:
+def pick_download_link(page_url: str, timeout: int) -> str | None:
     try:
         resp = requests.get(page_url, timeout=timeout)
         resp.raise_for_status()
@@ -111,7 +108,7 @@ def pick_download_link(page_url: str, timeout: int) -> Optional[str]:
     return link
 
 
-def check_gutenberg(ids: List[str], scrape_urls: List[str], timeout: int) -> int:
+def check_gutenberg(ids: list[str], scrape_urls: list[str], timeout: int) -> int:
     ok = 0
     for book_id in ids:
         urls = candidate_text_urls(book_id)
@@ -128,7 +125,7 @@ def check_gutenberg(ids: List[str], scrape_urls: List[str], timeout: int) -> int
     return ok
 
 
-def check_annas(urls: List[str], scrape: bool, timeout: int) -> int:
+def check_annas(urls: list[str], scrape: bool, timeout: int) -> int:
     ok = 0
     for url in urls:
         target = url

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
-import json
 import io
 import os
 from pathlib import Path
-import time
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 # Optional: PyPDF import
 try:
@@ -24,12 +23,12 @@ except ImportError:
 
 genai = None
 
-from zyntalic.translator import translate_text, warm_translation_pipeline, mirror_readback
 from zyntalic.logging_utils import get_logger
+from zyntalic.translator import mirror_readback, translate_text, warm_translation_pipeline
 from zyntalic.utils.cache import (
     get_cached_translation,
-    put_cached_translation,
     init_cache,
+    put_cached_translation,
 )
 
 # Cache translations by default for repeatability and speed.
@@ -163,7 +162,7 @@ def index_css():
 def clean_pdf_text(raw_text: str) -> str:
     """Clean extracted PDF text by removing metadata, garbled characters, and extra whitespace."""
     import re
-    
+
     # Remove common PDF metadata patterns
     metadata_patterns = [
         r'%PDF-[\d\.]+',
@@ -191,53 +190,52 @@ def clean_pdf_text(raw_text: str) -> str:
         r'/Length1?\s+\d+',
         r'/Type\s+/[A-Za-z]+',
     ]
-    
+
     cleaned = raw_text
     for pattern in metadata_patterns:
         cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE | re.DOTALL)
-    
+
     # Remove non-printable characters and binary data
     # Keep only ASCII printable, common punctuation, spaces, and basic Latin
     cleaned = ''.join(char for char in cleaned if (
         char.isprintable() or char in '\n\r\t'
     ) and ord(char) < 127 or char.isspace())
-    
+
     # Replace common PDF encoding issues
     replacements = {
         '�': '',  # Remove replacement character
-        '\x00': '',  # Remove null bytes
-        '\ufffd': '',  # Remove Unicode replacement character
+        '\x00': '',  # Remove Unicode replacement character
         '\r\n': '\n',  # Normalize line endings
         '\r': '\n',
     }
-    
+
     for old, new in replacements.items():
         cleaned = cleaned.replace(old, new)
-    
+
     # Remove patterns that look like encoding artifacts
     cleaned = re.sub(r'[^\w\s.,!?;:\'"\-()\[\]]+', '', cleaned)
-    
+
     # Remove multiple spaces and normalize whitespace
     cleaned = re.sub(r' +', ' ', cleaned)
     cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned)
-    
+
     # Remove lines that are just numbers, single characters, or look like metadata
     lines = cleaned.split('\n')
     filtered_lines = []
     for line in lines:
         line = line.strip()
         # Skip empty, numeric-only, single char, or metadata-looking lines
-        if (len(line) > 3 and 
-            not line.isdigit() and 
+        if (len(line) > 3 and
+            not line.isdigit() and
             not re.match(r'^[A-Z][a-z]+$', line) and  # Single words capitalized (often artifacts)
             not re.match(r'^\W+$', line)):  # Only punctuation
             filtered_lines.append(line)
-    
+
     cleaned = '\n'.join(filtered_lines)
-    
+
     # Final cleanup: remove leading/trailing whitespace
     cleaned = cleaned.strip()
-    
+
     return cleaned
 
 
@@ -246,7 +244,7 @@ if MULTIPART_INSTALLED:
     @app.post("/upload")
     async def upload_pdf(file: UploadFile = File(...)):
         """Upload and extract text from PDF or text files."""
-        
+
         # Handle plain text files
         if file.filename.endswith((".txt", ".md")):
             try:
@@ -255,14 +253,14 @@ if MULTIPART_INSTALLED:
                 return {"text": text.strip()}
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Error reading text file: {str(e)}")
-        
+
         # Handle PDF files
         if not file.filename.endswith(".pdf"):
             raise HTTPException(
                 status_code=400,
                 detail="File must be PDF, TXT, or MD format",
             )
-        
+
         if not PyPDF2:
             raise HTTPException(
                 status_code=500,
@@ -340,7 +338,7 @@ def translate(req: TranslateRequest):
             raise HTTPException(status_code=422, detail=f"Unsupported engine: {req.engine}")
 
         logger.info("Translate request: len=%s engine=%s mirror_rate=%.2f", len(text), req.engine, req.mirror_rate)
-        
+
         cached = None
         if USE_CACHE:
             cached = get_cached_translation(
@@ -448,7 +446,7 @@ def translate(req: TranslateRequest):
                 "cached": False,
             }
         return {"rows": stored_rows, "cached": False}
-        
+
     except Exception as exc:
         logger.exception("Translation failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Translation failed: {exc}") from exc

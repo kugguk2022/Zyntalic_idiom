@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Zyntalic Core (Schelling-anchored, Lexicon-aware)
 
@@ -16,10 +15,8 @@ import os
 import random
 import re
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Iterable
-
-from .syntax import ParsedSentence, to_zyntalic_order
 
 # --- Deterministic RNG --------------------------------------------------------
 try:
@@ -153,7 +150,7 @@ except Exception:
 _MIRROR_PIVOTS = ["na", "ve", "sy", "lu"]
 
 _MIRROR_LEXICON_PATH = os.path.join("data", "embeddings", "mirror_lexicon.json")
-_MIRROR_LEXICON: Optional[Dict[str, str]] = None
+_MIRROR_LEXICON: dict[str, str] | None = None
 
 # -------------------- Anchors --------------------
 ANCHORS = [
@@ -180,15 +177,15 @@ ANCHORS = [
 ]
 
 # -------------------- Lexicon Prior --------------------
-_LEXICON_CACHE: Optional[Dict[str, dict]] = None
-_VOCAB_MAPPINGS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
+_LEXICON_CACHE: dict[str, dict] | None = None
+_VOCAB_MAPPINGS_CACHE: dict[str, dict[str, str]] | None = None
 _PROJECTION_CACHE_SENTINEL = object()
 _PROJECTION_CACHE = _PROJECTION_CACHE_SENTINEL
-_VOCAB_EMB_CACHE: Dict[str, List[List[float]]] = {}
-_VOCAB_EMB_WORDS: Dict[str, List[str]] = {}
+_VOCAB_EMB_CACHE: dict[str, list[list[float]]] = {}
+_VOCAB_EMB_WORDS: dict[str, list[str]] = {}
 
 
-def load_vocabulary_mappings(filepath: str = "data/embeddings/vocabulary_mappings.json") -> Dict[str, Dict[str, str]]:
+def load_vocabulary_mappings(filepath: str = "data/embeddings/vocabulary_mappings.json") -> dict[str, dict[str, str]]:
     """Load pre-generated vocabulary mappings from English to Zyntalic.
 
     Tries the provided path, then falls back to a repo-relative default. Returns
@@ -197,11 +194,11 @@ def load_vocabulary_mappings(filepath: str = "data/embeddings/vocabulary_mapping
     global _VOCAB_MAPPINGS_CACHE
     if _VOCAB_MAPPINGS_CACHE is not None:
         return _VOCAB_MAPPINGS_CACHE
-    
+
     # Try to load from file (direct path)
     if os.path.exists(filepath):
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, encoding='utf-8') as f:
                 _VOCAB_MAPPINGS_CACHE = json.load(f)
                 return _VOCAB_MAPPINGS_CACHE
         except Exception:
@@ -218,13 +215,13 @@ def load_vocabulary_mappings(filepath: str = "data/embeddings/vocabulary_mapping
                 return _VOCAB_MAPPINGS_CACHE
     except Exception:
         pass
-    
+
     # Return empty dict if not found
     _VOCAB_MAPPINGS_CACHE = {}
     return _VOCAB_MAPPINGS_CACHE
 
 
-def _load_mirror_lexicon() -> Dict[str, str]:
+def _load_mirror_lexicon() -> dict[str, str]:
     global _MIRROR_LEXICON
     if _MIRROR_LEXICON is not None:
         return _MIRROR_LEXICON
@@ -271,7 +268,7 @@ def _load_mirror_lexicon() -> Dict[str, str]:
     data = dict(base)
     if os.path.exists(_MIRROR_LEXICON_PATH):
         try:
-            with open(_MIRROR_LEXICON_PATH, "r", encoding="utf-8") as f:
+            with open(_MIRROR_LEXICON_PATH, encoding="utf-8") as f:
                 extra = json.load(f)
             if isinstance(extra, dict):
                 for k, v in extra.items():
@@ -283,7 +280,7 @@ def _load_mirror_lexicon() -> Dict[str, str]:
     return _MIRROR_LEXICON
 
 
-def _mirror_term(term: str) -> Optional[str]:
+def _mirror_term(term: str) -> str | None:
     key = (term or "").strip().lower()
     if not key:
         return None
@@ -301,7 +298,7 @@ def _mirror_term(term: str) -> Optional[str]:
     return None
 
 
-def load_lexicons(dirpath: str = "lexicon") -> Dict[str, dict]:
+def load_lexicons(dirpath: str = "lexicon") -> dict[str, dict]:
     """Load anchor lexicons.
 
     Resolution order:
@@ -312,7 +309,7 @@ def load_lexicons(dirpath: str = "lexicon") -> Dict[str, dict]:
     if _LEXICON_CACHE is not None:
         return _LEXICON_CACHE
 
-    data: Dict[str, dict] = {}
+    data: dict[str, dict] = {}
 
     # 1) Local filesystem (dev / overrides)
     if dirpath and os.path.isdir(dirpath):
@@ -320,7 +317,7 @@ def load_lexicons(dirpath: str = "lexicon") -> Dict[str, dict]:
             if not fn.endswith(".json"):
                 continue
             try:
-                with open(os.path.join(dirpath, fn), "r", encoding="utf-8") as f:
+                with open(os.path.join(dirpath, fn), encoding="utf-8") as f:
                     obj = json.load(f)
                 key = fn[:-5]
                 data[key] = obj
@@ -379,7 +376,7 @@ def _mix_lists(anchors, weights, field, base_list, k_sharpen=1.0):
     return pool, wts
 
 
-def _choose_motif(rng, anchors, weights, mirror_state: Optional[MirrorState] = None):
+def _choose_motif(rng, anchors, weights, mirror_state: MirrorState | None = None):
     """Deterministic motif selection."""
     lex = load_lexicons()
     motif_pool, motif_w = [], []
@@ -438,9 +435,9 @@ def _choose_motif(rng, anchors, weights, mirror_state: Optional[MirrorState] = N
 
 def _pick_pair_from_terms(
     rng,
-    terms: List,
-    mirror_state: Optional[MirrorState] = None,
-) -> Tuple[Tuple[str, str], Tuple[str, str]]:
+    terms: list,
+    mirror_state: MirrorState | None = None,
+) -> tuple[tuple[str, str], tuple[str, str]]:
     if not terms:
         raise ValueError("Need terms for mirror pairing.")
 
@@ -524,7 +521,7 @@ def _pick_pair_from_terms(
 # -------------------- Helpers --------------------
 def compose_hangul_block(ch: str, ju: str, jo: str) -> str:
     """Compose a Hangul syllable block from jamo lists."""
-    l_count, v_count, t_count = 19, 21, 28
+    _l_count, v_count, t_count = 19, 21, 28
     s_base = 0xAC00
     try:
         l_idx = CHOSEONG.index(ch)
@@ -561,7 +558,7 @@ def _normalize(v):
     return [x / n for x in v]
 
 
-def _cosine(a: List[float], b: List[float]) -> float:
+def _cosine(a: list[float], b: list[float]) -> float:
     return _dot(a, b) / ((_l2(a) or 1.0) * (_l2(b) or 1.0))
 
 
@@ -676,13 +673,13 @@ class MirrorState:
     recent_templates: deque = field(default_factory=lambda: deque(maxlen=6))
     recent_connectors: deque = field(default_factory=lambda: deque(maxlen=6))
 
-    def motif_key(self, a: str, b: str) -> Tuple[str, str]:
+    def motif_key(self, a: str, b: str) -> tuple[str, str]:
         return tuple(sorted((a, b)))
 
-    def term_key(self, a: str, b: str) -> Tuple[str, str]:
+    def term_key(self, a: str, b: str) -> tuple[str, str]:
         return tuple(sorted((a, b)))
 
-def _mirror_tokens() -> List[str]:
+def _mirror_tokens() -> list[str]:
     global _MIRROR_TOKENS
     if _MIRROR_TOKENS is not None:
         return _MIRROR_TOKENS
@@ -727,7 +724,7 @@ def _pick_mapped_token(rng, vocab_mappings, field: str, pool, weights, base_list
     return _map_term_to_zyntalic(en, field, rng=rng, vocab_mappings=vocab_mappings)
 
 
-def _stable_pick(values: Iterable[str], seed: str) -> Optional[str]:
+def _stable_pick(values: Iterable[str], seed: str) -> str | None:
     vals = list(values)
     if not vals:
         return None
@@ -735,7 +732,7 @@ def _stable_pick(values: Iterable[str], seed: str) -> Optional[str]:
     return vals[int(rng.random() * len(vals))]
 
 
-def _surface_script_counts(text: str) -> Dict[str, int]:
+def _surface_script_counts(text: str) -> dict[str, int]:
     counts = {"hangul": 0, "latin": 0}
     for ch in text or "":
         if "\uac00" <= ch <= "\ud7af":
@@ -755,7 +752,7 @@ def _surface_profile_ok(text: str, field: str) -> bool:
     if total == 0:
         return False
 
-    hangul_ratio = counts["hangul"] / total
+    counts["hangul"] / total
     field = (field or "").lower()
 
     # Visible surface tokens should read as Polish/Latin; Hangul is reserved
@@ -776,7 +773,7 @@ def _repair_surface_profile(text: str, field: str, seed_key: str) -> str:
     return generate_word(seed_key)
 
 
-def _get_vocab_embeddings(field: str, vocab_mappings) -> Optional[Tuple[List[str], List[List[float]]]]:
+def _get_vocab_embeddings(field: str, vocab_mappings) -> tuple[list[str], list[list[float]]] | None:
     if embed_text is None:
         return None
     if field in _VOCAB_EMB_CACHE and field in _VOCAB_EMB_WORDS:
@@ -800,7 +797,7 @@ def _map_term_to_zyntalic(
     field: str,
     *,
     rng,
-    vocab_mappings: Optional[Dict[str, Dict[str, str]]] = None,
+    vocab_mappings: dict[str, dict[str, str]] | None = None,
 ) -> str:
     if vocab_mappings is None:
         vocab_mappings = load_vocabulary_mappings()
@@ -841,8 +838,8 @@ def mirrored_sentence_anchored(
     rng,
     anchors,
     weights,
-    mirror_state: Optional[MirrorState] = None,
-    mirror_terms: Optional[List[Dict[str, str]]] = None,
+    mirror_state: MirrorState | None = None,
+    mirror_terms: list[dict[str, str]] | None = None,
 ) -> str:
     """Chiasmus style (Zyntalic mirror templates)."""
     if mirror_terms and len(mirror_terms) >= 2:
@@ -937,12 +934,12 @@ def make_korean_tail(seed_key: str) -> str:
 def make_context(
     seed_key: str,
     word: str,
-    chosen_anchors: List[str],
+    chosen_anchors: list[str],
     pos_hint: str,
-    ctx_terms: Optional[List[str]] = None,
+    ctx_terms: list[str] | None = None,
 ) -> str:
     lemma = lemmatize(word)
-    ctx_anchors = "|".join(chosen_anchors)
+    "|".join(chosen_anchors)
     han = make_korean_tail(seed_key or lemma)
     if _CTX_READBACK and ctx_terms:
         keys = "|".join(ctx_terms[:2])
@@ -960,13 +957,13 @@ def base_embedding(key: str, dim: int = 300):
 
 
 
-_ANCHOR_VECS_CACHE: Optional[Dict[str, List[float]]] = None
+_ANCHOR_VECS_CACHE: dict[str, list[float]] | None = None
 
-def _get_anchor_vecs(dim: int = 300) -> Dict[str, List[float]]:
+def _get_anchor_vecs(dim: int = 300) -> dict[str, list[float]]:
     global _ANCHOR_VECS_CACHE
     if _ANCHOR_VECS_CACHE is not None:
         return _ANCHOR_VECS_CACHE
-    
+
     vecs = {}
     for name in ANCHORS:
         label = name.replace("_", " ")
@@ -975,13 +972,13 @@ def _get_anchor_vecs(dim: int = 300) -> Dict[str, List[float]]:
     return _ANCHOR_VECS_CACHE
 
 
-def anchor_weights_for_vec(vec: List[float], top_k: int = 3):
+def anchor_weights_for_vec(vec: list[float], top_k: int = 3):
     v = _normalize(vec)
     scores = []
-    
+
     # Use lazy getter
     anchor_vecs = _get_anchor_vecs(len(v))
-    
+
     for a, av in anchor_vecs.items():
         scores.append((a, _dot(v, _normalize(av))))
     scores.sort(key=lambda x: x[1], reverse=True)
@@ -993,9 +990,9 @@ def anchor_weights_for_vec(vec: List[float], top_k: int = 3):
     return [(name, w) for (name, _), w in zip(top, weights)]
 
 
-def _normalize_anchor_override(anchor_weights: Optional[List[Tuple[str, float]]]) -> List[Tuple[str, float]]:
-    merged: Dict[str, float] = {}
-    order: List[str] = []
+def _normalize_anchor_override(anchor_weights: list[tuple[str, float]] | None) -> list[tuple[str, float]]:
+    merged: dict[str, float] = {}
+    order: list[str] = []
     for item in anchor_weights or []:
         if not isinstance(item, (list, tuple)) or len(item) < 2:
             continue
@@ -1039,7 +1036,7 @@ def get_projection(path: str = "models/W.npy"):
     return _PROJECTION_CACHE
 
 
-def apply_projection(vec: List[float], W) -> List[float]:
+def apply_projection(vec: list[float], W) -> list[float]:
     if np is None or W is None:
         return vec
     v = np.asarray(vec).reshape(1, -1) @ W
@@ -1051,7 +1048,7 @@ def generate_embedding(
     seed_key: str,
     dim: int = 300,
     W=None,
-    anchor_weights_override: Optional[List[Tuple[str, float]]] = None,
+    anchor_weights_override: list[tuple[str, float]] | None = None,
 ):
     vb = base_embedding(seed_key, dim)
     canon = apply_projection(vb, W)
@@ -1073,10 +1070,10 @@ def generate_embedding(
     elif canon == vb and W is None:
         # no projection: softly mix with anchors
         aw0 = anchor_weights_for_vec(vb, top_k=3)
-        
+
         anchor_vecs = _get_anchor_vecs()
         vecs = [vb] + [anchor_vecs[a] for a, _ in aw0]
-        
+
         ws = [0.5] + [0.5 * w for _, w in aw0]
         canon = _normalize(_mix(vecs, ws))
         aw = anchor_weights_for_vec(canon, top_k=3)
@@ -1086,14 +1083,14 @@ def generate_embedding(
 
 
 def _build_context_terms(
-    mirror_terms: Optional[List[Dict[str, str]]],
+    mirror_terms: list[dict[str, str]] | None,
     rng,
-) -> Optional[List[str]]:
+) -> list[str] | None:
     """Map optional readback terms into deterministic Zyntalic context keywords."""
     if not (_CTX_READBACK and mirror_terms):
         return None
 
-    ctx_terms: List[str] = []
+    ctx_terms: list[str] = []
     for t in mirror_terms:
         if len(ctx_terms) >= max(1, _CTX_KEYWORD_COUNT):
             break
@@ -1113,10 +1110,10 @@ def _generate_entry_legacy(
     seed_word: str,
     mirror_rate: float = 0.3,
     W=None,
-    mirror_state: Optional[MirrorState] = None,
-    mirror_terms: Optional[List[Dict[str, str]]] = None,
-    anchor_weights_override: Optional[List[Tuple[str, float]]] = None,
-) -> Dict:
+    mirror_state: MirrorState | None = None,
+    mirror_terms: list[dict[str, str]] | None = None,
+    anchor_weights_override: list[tuple[str, float]] | None = None,
+) -> dict:
     """Legacy single-pass generator retained as deterministic fallback."""
     rng = get_rng(seed_word)
 
@@ -1155,10 +1152,10 @@ def _generate_entry_staged(
     seed_word: str,
     mirror_rate: float = 0.3,
     W=None,
-    mirror_state: Optional[MirrorState] = None,
-    mirror_terms: Optional[List[Dict[str, str]]] = None,
-    anchor_weights_override: Optional[List[Tuple[str, float]]] = None,
-) -> Dict:
+    mirror_state: MirrorState | None = None,
+    mirror_terms: list[dict[str, str]] | None = None,
+    anchor_weights_override: list[tuple[str, float]] | None = None,
+) -> dict:
     """Rule-guided staged generator.
 
     Stages:
@@ -1220,10 +1217,10 @@ def generate_entry(
     seed_word: str,
     mirror_rate: float = 0.3,
     W=None,
-    mirror_state: Optional[MirrorState] = None,
-    mirror_terms: Optional[List[Dict[str, str]]] = None,
-    anchor_weights_override: Optional[List[Tuple[str, float]]] = None,
-) -> Dict:
+    mirror_state: MirrorState | None = None,
+    mirror_terms: list[dict[str, str]] | None = None,
+    anchor_weights_override: list[tuple[str, float]] | None = None,
+) -> dict:
     """
     Generate a full dictionary entry deterministically.
     seed_word: The English input (e.g., 'Love') which seeds ALL randomness.

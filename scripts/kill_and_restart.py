@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Kill any process using port 8001 and restart the server."""
 
+import os
 import subprocess
 import sys
 import time
-import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -15,8 +15,8 @@ def kill_port_8001():
         if sys.platform == 'win32':
             # Windows
             result = subprocess.run(
-                ['netstat', '-ano'], 
-                capture_output=True, 
+                ['netstat', '-ano'],
+                capture_output=True,
                 text=True
             )
             for line in result.stdout.split('\n'):
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Zyntalic Server Restart Tool")
     print("=" * 60)
-    
+
     kill_port_8001()
     print("\nWaiting 2 seconds...")
     time.sleep(2)

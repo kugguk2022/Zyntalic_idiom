@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Zyntalic syntax + lightweight English parsing.
 
@@ -13,8 +12,8 @@ S-O-V-C rearrangements, with an optional spaCy-backed tokenizer if available.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 from . import nlp
 
@@ -57,7 +56,7 @@ class ParsedSentence:
     obj_plural: bool = False
 
 
-def _tokenize(text: str, use_nlp: Optional[bool] = None) -> list[str]:
+def _tokenize(text: str, use_nlp: bool | None = None) -> list[str]:
     # Keep apostrophes inside words; optionally use NLP backend.
     if use_nlp is None:
         use_nlp = nlp.backend_name() == "spacy"
@@ -117,7 +116,7 @@ def _find_verb(tokens: Sequence[str]) -> int:
     return max(0, min(len(tokens)-1, len(tokens)//2))
 
 
-def parse_english(text: str, *, use_nlp: Optional[bool] = None) -> ParsedSentence:
+def parse_english(text: str, *, use_nlp: bool | None = None) -> ParsedSentence:
     tokens = _tokenize(text, use_nlp=use_nlp)
     if not tokens:
         return ParsedSentence(subject="", verb="", obj="", context="")
@@ -180,7 +179,7 @@ def pluralize(noun: str) -> str:
     return noun + "-" + _hungarian_plural_suffix(noun)
 
 
-def mark_tense(verb: str, tense: Optional[str]) -> str:
+def mark_tense(verb: str, tense: str | None) -> str:
     verb = verb.strip()
     if not verb:
         return verb

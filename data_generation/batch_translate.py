@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Batch translate sentences to Zyntalic.
 
@@ -13,8 +12,8 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List
 
 try:
     import requests
@@ -22,7 +21,7 @@ except Exception:
     requests = None
 
 
-def iter_jsonl(path: Path) -> Iterable[Dict]:
+def iter_jsonl(path: Path) -> Iterable[dict]:
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -31,18 +30,18 @@ def iter_jsonl(path: Path) -> Iterable[Dict]:
             yield json.loads(line)
 
 
-def translate_api(sentences: List[str], mirror_rate: float, engine: str) -> List[Dict]:
+def translate_api(sentences: list[str], mirror_rate: float, engine: str) -> list[dict]:
     from zyntalic import translator
     translator.warm_translation_pipeline()
     rows = translator.translate_batch(sentences, mirror_rate=mirror_rate, engine=engine, flatten=True)
     return rows
 
 
-def translate_server(sentences: List[str], mirror_rate: float, engine: str, url: str) -> List[Dict]:
+def translate_server(sentences: list[str], mirror_rate: float, engine: str, url: str) -> list[dict]:
     if requests is None:
         raise SystemExit("requests not available. Install with: pip install -e .[data]")
 
-    rows: List[Dict] = []
+    rows: list[dict] = []
     for s in sentences:
         payload = {"text": s, "mirror_rate": mirror_rate, "engine": engine}
         resp = requests.post(url, json=payload, timeout=60)

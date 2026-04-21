@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Embedding backend for Zyntalic.
 
@@ -12,7 +11,6 @@ a better backend when you want it.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
 import atexit
 import hashlib
 import json
@@ -22,7 +20,7 @@ import threading
 from pathlib import Path
 
 _MODEL = None
-_DIM: Optional[int] = None
+_DIM: int | None = None
 _MODEL_ATTEMPTED = False
 _MODEL_LOCK = threading.Lock()
 
@@ -54,8 +52,8 @@ _CACHE_FLUSH_EVERY = int(os.getenv("ZYNTALIC_EMBED_CACHE_FLUSH", "50"))
 
 _CACHE_LOCK = threading.Lock()
 _CACHE_LOADED = False
-_WORD2VEC: Dict[str, List[float]] = {}
-_CONTEXT2VEC: Dict[str, List[float]] = {}
+_WORD2VEC: dict[str, list[float]] = {}
+_CONTEXT2VEC: dict[str, list[float]] = {}
 _WORD_DIRTY = 0
 _CONTEXT_DIRTY = 0
 
@@ -94,7 +92,7 @@ def _load_cache() -> None:
     _CACHE_LOADED = True
 
 
-def _write_cache(path: Path, payload: Dict[str, List[float]]) -> None:
+def _write_cache(path: Path, payload: dict[str, list[float]]) -> None:
     _ensure_cache_dir()
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     try:
@@ -125,12 +123,12 @@ def _cache_key(text: str, dim: int) -> str:
     return f"{dim}::{text}"
 
 
-def _cache_bucket(text: str) -> Dict[str, List[float]]:
+def _cache_bucket(text: str) -> dict[str, list[float]]:
     # Single token (no whitespace) -> word2vector, otherwise context2vector.
     return _WORD2VEC if (text and not any(ch.isspace() for ch in text)) else _CONTEXT2VEC
 
 
-def _get_cached_vector(text: str, dim: int) -> Optional[List[float]]:
+def _get_cached_vector(text: str, dim: int) -> list[float] | None:
     if not _CACHE_ENABLED:
         return None
     _load_cache()
@@ -142,7 +140,7 @@ def _get_cached_vector(text: str, dim: int) -> Optional[List[float]]:
     return None
 
 
-def _store_cached_vector(text: str, dim: int, vec: List[float]) -> None:
+def _store_cached_vector(text: str, dim: int, vec: list[float]) -> None:
     global _WORD_DIRTY, _CONTEXT_DIRTY
     if not _CACHE_ENABLED:
         return
@@ -189,7 +187,7 @@ def _lazy_load_model() -> None:
             _DIM = None
 
 
-def embed_text(text: str, dim: int = 300) -> List[float]:
+def embed_text(text: str, dim: int = 300) -> list[float]:
     """
     Return a deterministic embedding vector of length `dim`.
 

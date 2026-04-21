@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Test PDF text cleaning functionality."""
 
 import re
 
+
 def clean_pdf_text(raw_text: str) -> str:
     """Clean extracted PDF text by removing metadata, garbled characters, and extra whitespace."""
-    
+
     # Remove common PDF metadata patterns
     metadata_patterns = [
         r'%PDF-[\d\.]+',
@@ -29,27 +29,26 @@ def clean_pdf_text(raw_text: str) -> str:
         r'startxref',
         r'%%EOF',
     ]
-    
+
     cleaned = raw_text
     for pattern in metadata_patterns:
         cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE | re.DOTALL)
-    
+
     # Replace common PDF encoding issues
     replacements = {
         '�': '',  # Remove replacement character
-        '\x00': '',  # Remove null bytes
-        '\ufffd': '',  # Remove Unicode replacement character
+        '\x00': '',  # Remove Unicode replacement character
         '\r\n': '\n',  # Normalize line endings
         '\r': '\n',
     }
-    
+
     for old, new in replacements.items():
         cleaned = cleaned.replace(old, new)
-    
+
     # Remove multiple spaces and normalize whitespace
     cleaned = re.sub(r' +', ' ', cleaned)
     cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned)
-    
+
     # Remove lines that are just numbers or single characters (often page numbers)
     lines = cleaned.split('\n')
     filtered_lines = []
@@ -58,17 +57,17 @@ def clean_pdf_text(raw_text: str) -> str:
         # Keep line if it has substantial content
         if len(line) > 3 and not line.isdigit():
             filtered_lines.append(line)
-    
+
     cleaned = '\n'.join(filtered_lines)
-    
+
     # Final cleanup: remove leading/trailing whitespace
     cleaned = cleaned.strip()
-    
+
     return cleaned
 
 
 # Test with the problematic PDF text from the screenshot
-test_input = """%PDF-1.4
+test_input = r"""%PDF-1.4
 %����
 1 0 obj<</Author(�� E � a d e Q u e i r � s , R a m a l h o
 O r t i g � o & E � a d e

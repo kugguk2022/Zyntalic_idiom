@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Simple translation cache to keep source→target pairs stable.
 
 Stores entries in JSON at data/cache/translations.json. Each entry includes:
@@ -16,11 +15,11 @@ Cache key is deterministic (engine + mirror_rate + source).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-import hashlib
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from zyntalic.embeddings import embed_text
 
@@ -29,7 +28,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 CACHE_DIR = os.path.join(ROOT_DIR, "data", "cache")
 CACHE_PATH = os.path.join(CACHE_DIR, "translations.json")
 
-_cache: Dict[str, Dict[str, Any]] = {}
+_cache: dict[str, dict[str, Any]] = {}
 _initialized = False
 
 
@@ -38,10 +37,10 @@ def _ensure_dirs() -> None:
         os.makedirs(CACHE_DIR, exist_ok=True)
 
 
-def _normalize_options(options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _normalize_options(options: dict[str, Any] | None = None) -> dict[str, Any]:
     if not options:
         return {}
-    normalized: Dict[str, Any] = {}
+    normalized: dict[str, Any] = {}
     for key, value in options.items():
         if value is None:
             continue
@@ -57,7 +56,7 @@ def _key(
     source: str,
     engine: str,
     mirror_rate: float,
-    options: Optional[Dict[str, Any]] = None,
+    options: dict[str, Any] | None = None,
 ) -> str:
     normalized_source = (source or "").strip()
     payload = json.dumps(
@@ -83,7 +82,7 @@ def init_cache() -> None:
     _ensure_dirs()
     if os.path.exists(CACHE_PATH):
         try:
-            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+            with open(CACHE_PATH, encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
                     _cache = data
@@ -108,8 +107,8 @@ def get_cached_translation(
     source: str,
     engine: str,
     mirror_rate: float,
-    options: Optional[Dict[str, Any]] = None,
-) -> Optional[Dict[str, Any]]:
+    options: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     init_cache()
     k = _key(source, engine, mirror_rate, options=options)
     entry = _cache.get(k)
@@ -124,12 +123,12 @@ def put_cached_translation(
     target: str,
     engine: str,
     mirror_rate: float,
-    anchors: Optional[List] = None,
-    embedding: Optional[List[float]] = None,
-    mirror_text: Optional[str] = None,
-    sidecar: Optional[Dict[str, Any]] = None,
-    options: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    anchors: list | None = None,
+    embedding: list[float] | None = None,
+    mirror_text: str | None = None,
+    sidecar: dict[str, Any] | None = None,
+    options: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Store translation and return the stored entry."""
     init_cache()
     if embedding is None:

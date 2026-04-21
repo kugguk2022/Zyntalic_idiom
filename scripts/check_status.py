@@ -6,10 +6,8 @@ Diagnoses common issues and provides fixes
 
 import subprocess
 import sys
-import os
-import json
 from pathlib import Path
-from urllib import request, error
+from urllib import request
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -106,7 +104,7 @@ def main():
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)
-    
+
     if server_running and frontend_built and deps_ok and (test_api() if server_running else True):
         print("✅ All systems operational!")
         print()
@@ -118,7 +116,7 @@ def main():
         print("  • Context tail only shows Korean markers (no anchor clutter)")
     else:
         print("⚠️  Some issues detected. See fixes above.")
-    
+
     print("=" * 70)
 
 if __name__ == "__main__":

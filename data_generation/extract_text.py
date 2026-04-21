@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Extract text from raw files into a flat text corpus directory.
 
@@ -11,8 +10,8 @@ Supports:
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 try:
     import PyPDF2  # type: ignore

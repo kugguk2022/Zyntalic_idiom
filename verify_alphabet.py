@@ -1,6 +1,7 @@
 
-from zyntalic import core
 import re
+
+from zyntalic import core
 
 print("--- Alphabet Verification ---")
 

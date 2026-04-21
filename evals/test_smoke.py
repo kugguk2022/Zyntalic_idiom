@@ -1,5 +1,5 @@
-import json
 from zyntalic.translator import translate_text
+
 
 def test_translate_returns_rows():
     rows = translate_text("Hello world.")

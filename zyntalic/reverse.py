@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Reverse translation utilities (Zyntalic -> English-ish).
 
@@ -11,17 +10,16 @@ This is a heuristic decoder that:
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Tuple
 
 from . import core
 
 _CONTEXT_RE = re.compile(r"\s*⟦ctx:[^⟧]*⟧\s*$")
 _TOKEN_RE = re.compile(r"^([^\w]*)([\w\-]+)([^\w]*)$", re.UNICODE)
 
-_REVERSE_CACHE: Optional[Dict[str, Dict[str, str]]] = None
+_REVERSE_CACHE: dict[str, dict[str, str]] | None = None
 
 
-def _strip_context_tail(text: str) -> Tuple[str, Optional[str]]:
+def _strip_context_tail(text: str) -> tuple[str, str | None]:
     if not text:
         return "", None
     m = _CONTEXT_RE.search(text)
@@ -35,9 +33,9 @@ def _looks_zyntalic(text: str) -> bool:
     return any(ord(ch) > 127 for ch in text)
 
 
-def _build_reverse_vocab() -> Dict[str, Dict[str, str]]:
+def _build_reverse_vocab() -> dict[str, dict[str, str]]:
     vocab = core.load_vocabulary_mappings()
-    reverse: Dict[str, Dict[str, str]] = {
+    reverse: dict[str, dict[str, str]] = {
         "adjectives": {},
         "nouns": {},
         "verbs": {},
@@ -55,14 +53,14 @@ def _build_reverse_vocab() -> Dict[str, Dict[str, str]]:
     return reverse
 
 
-def _reverse_vocab() -> Dict[str, Dict[str, str]]:
+def _reverse_vocab() -> dict[str, dict[str, str]]:
     global _REVERSE_CACHE
     if _REVERSE_CACHE is None:
         _REVERSE_CACHE = _build_reverse_vocab()
     return _REVERSE_CACHE
 
 
-def _decode_token(token: str, pos_map: Dict[str, str], any_map: Dict[str, str]) -> str:
+def _decode_token(token: str, pos_map: dict[str, str], any_map: dict[str, str]) -> str:
     m = _TOKEN_RE.match(token)
     if not m:
         return token
@@ -75,7 +73,7 @@ def _decode_token(token: str, pos_map: Dict[str, str], any_map: Dict[str, str]) 
     return f"{pre}{en}{post}"
 
 
-def _decode_tokens(tokens: List[str]) -> str:
+def _decode_tokens(tokens: list[str]) -> str:
     rev = _reverse_vocab()
     if not tokens:
         return ""
@@ -103,7 +101,7 @@ def format_context(anchors) -> str:
     return "Context: " + ", ".join(parts)
 
 
-def reverse_translate_sentence(text: str) -> Dict:
+def reverse_translate_sentence(text: str) -> dict:
     src = (text or "").strip()
     stripped, _ctx = _strip_context_tail(src)
     if not stripped:
