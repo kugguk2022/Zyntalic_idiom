@@ -163,11 +163,12 @@ const App: React.FC = () => {
       <header className="border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4 group cursor-default">
-            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-all duration-300 group-hover:scale-105 group-hover:rotate-3">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 text-white fill-current">
-                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z" />
-              </svg>
-            </div>
+            <img
+              src="/favicon.svg"
+              alt=""
+              aria-hidden="true"
+              className="w-10 h-10 rounded-lg shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-all duration-300 group-hover:scale-105 group-hover:rotate-3"
+            />
             <div>
               <h1 className="text-xl font-bold tracking-tight text-white transition-colors group-hover:text-indigo-400">Zyntalic Flow</h1>
               <p className="text-[10px] text-slate-500 font-medium uppercase tracking-[0.2em] -mt-1">Deterministic Semantic Engine</p>
