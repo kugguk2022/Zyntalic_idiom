@@ -137,7 +137,7 @@ def read_root():
 
 @app.get("/favicon.ico")
 def favicon():
-    icon_path = _find_frontend_file("favicon.ico") or _find_frontend_file("favicon.svg")
+    icon_path = _find_frontend_file("favicon.svg") or _find_frontend_file("favicon.ico")
     if icon_path:
         media = "image/x-icon" if icon_path.suffix == ".ico" else "image/svg+xml"
         return FileResponse(icon_path, media_type=media)
