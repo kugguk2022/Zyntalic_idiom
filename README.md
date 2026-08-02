@@ -1,7 +1,7 @@
 # Zyntalic
 
 <p align="center">
-  <img src="zyntalic-flow/public/favicon.svg" alt="Zyntalic logo" width="128">
+  <img src="zyntalic-flow/public/favicon.svg" alt="Zyntalic logo" width="600">
 </p>
 
 A deterministic **synthetic-language toolkit** (conlang engine) that maps input text to a stable “Zyntalic” surface form using:
