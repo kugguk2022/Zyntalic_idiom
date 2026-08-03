@@ -29,7 +29,7 @@
     <filter id="zbg-soft" x="-40%" y="-40%" width="180%" height="180%">
       <feGaussianBlur stdDeviation="13"/>
     </filter>
-    <clipPath id="zbg-clip"><rect x="0" y="0" width="1400" height="1000"/></clipPath>
+    <clipPath id="zbg-clip"><rect x="0" y="0" width="1400" height="1000" rx="203" ry="203"/></clipPath>
   </defs>
   <sodipodi:namedview
      id="namedview28"
@@ -41,7 +41,7 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1" />
   <g id="zyntalic-bg" clip-path="url(#zbg-clip)">
-    <rect x="0" y="0" width="1400" height="1000" fill="url(#zbg-grad)"/>
+    <rect x="0" y="0" width="1400" height="1000" rx="203" ry="203" fill="url(#zbg-grad)"/>
     <g id="zbg-bars">
       <line x1="30" y1="454" x2="30" y2="546" stroke="#eafcae" stroke-width="7" stroke-dasharray="9 7" opacity="0.16"/>
       <line x1="52" y1="448" x2="52" y2="552" stroke="#eafcae" stroke-width="7" stroke-dasharray="9 7" opacity="0.16"/>
@@ -131,7 +131,7 @@
       <line x1="0" y1="360" x2="1400" y2="360" stroke="#ffffff" stroke-width="2" opacity="0.16" filter="url(#zbg-glow)"/>
       <line x1="0" y1="640" x2="1400" y2="640" stroke="#ffffff" stroke-width="2" opacity="0.16" filter="url(#zbg-glow)"/>
     </g>
-    <rect x="0" y="0" width="1400" height="1000" fill="url(#zbg-core)"/>
+    <rect x="0" y="0" width="1400" height="1000" rx="203" ry="203" fill="url(#zbg-core)"/>
   </g>
 
   <title
