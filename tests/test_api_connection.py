@@ -1,41 +1,20 @@
-import requests
-import json
+"""In-process API smoke test; no separately running server is required."""
 
-print("=" * 70)
-print("Testing Zyntalic API Connection")
-print("=" * 70)
+from fastapi.testclient import TestClient
 
-url = "http://127.0.0.1:8001/translate"
-data = {
-    "text": "The quick brown fox jumps over the lazy dog.",
-    "mirror_rate": 0.3,
-    "engine": "core"
-}
+from apps.web.app import app
 
-try:
-    print(f"\nSending request to: {url}")
-    print(f"Data: {json.dumps(data, indent=2)}\n")
-    
-    response = requests.post(url, json=data, timeout=10)
-    response.raise_for_status()
-    
-    result = response.json()
-    print("✅ API Connection Successful!\n")
-    print("Response:")
-    print("-" * 70)
-    print(json.dumps(result, indent=2, ensure_ascii=False))
-    print("\n" + "=" * 70)
-    print("The frontend should now show:")
-    print("=" * 70)
-    
-    for row in result.get('rows', []):
-        print(f"\n[{row.get('source', 'N/A')}]")
-        print(f"→ {row.get('target', 'N/A')}")
-    
-    print("\n✅ Server is working correctly!")
-    
-except requests.exceptions.ConnectionError:
-    print("❌ ERROR: Cannot connect to server at http://127.0.0.1:8001")
-    print("   Make sure the server is running: python -m run_desktop")
-except Exception as e:
-    print(f"❌ ERROR: {e}")
+
+def test_api_translation_connection():
+    with TestClient(app) as client:
+        response = client.post(
+            "/translate",
+            json={
+                "text": "The quick brown fox jumps over the lazy dog.",
+                "mirror_rate": 0.3,
+                "engine": "core",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["rows"][0]["target"]

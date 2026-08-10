@@ -63,8 +63,24 @@ pip install -e ".[web]"
 uvicorn apps.web.app:app --reload --port 8000
 ```
 
-- `GET /health`
-- `POST /translate`
+- `GET /health` and `POST /translate` remain compatible with the desktop UI.
+- `GET /v1/health` reports readiness, limits, version, and cache status.
+- `POST /v1/translate` adds a request ID and processing time.
+- `POST /v1/translate/batch` translates up to 32 independent inputs per request.
+- `POST /v1/extract` extracts UTF-8 text from PDF, TXT, or Markdown uploads.
+- Interactive OpenAPI documentation is available at `/docs`.
+
+Example:
+
+```bash
+curl -s http://127.0.0.1:8000/v1/translate \
+  -H 'content-type: application/json' \
+  -d '{"text":"I see the river at night.","engine":"core","mirror_rate":0.3}'
+```
+
+The server uses a concurrent SQLite WAL cache instead of rewriting one JSON
+file for every sentence. Set `ZYNTALIC_CACHE_PATH` when deployments need a
+persistent volume, or `ZYNTALIC_USE_CACHE=0` to disable it.
 
 ## Desktop/Web launcher
 
