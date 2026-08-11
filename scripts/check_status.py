@@ -6,10 +6,8 @@ Diagnoses common issues and provides fixes
 
 import subprocess
 import sys
-import os
-import json
 from pathlib import Path
-from urllib import request, error
+from urllib import request
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -23,7 +21,7 @@ def check_server_running():
         else:
             result = subprocess.run(["lsof", "-ti", ":8001"], capture_output=True, text=True)
             return bool(result.stdout.strip())
-    except:
+    except Exception:
         return False
 
 

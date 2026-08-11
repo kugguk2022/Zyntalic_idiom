@@ -1,19 +1,24 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import os
 import re
+import secrets
+import threading
 import time
 import uuid
+from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
+from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -51,7 +56,79 @@ MAX_TEXT_CHARS = int(os.getenv("ZYNTALIC_MAX_TEXT_CHARS", "20000"))
 MAX_BATCH_ITEMS = int(os.getenv("ZYNTALIC_MAX_BATCH_ITEMS", "32"))
 MAX_BATCH_CHARS = int(os.getenv("ZYNTALIC_MAX_BATCH_CHARS", "100000"))
 MAX_UPLOAD_BYTES = int(os.getenv("ZYNTALIC_MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
-ALLOWED_ENGINES = {"core", "transformer", "chiasmus", "test_suite", "reverse"}
+RATE_LIMIT_PER_MINUTE = int(os.getenv("ZYNTALIC_RATE_LIMIT_PER_MINUTE", "60"))
+API_KEY = os.getenv("ZYNTALIC_API_KEY", "")
+ALLOW_UNAUTHENTICATED_LOCAL = os.getenv(
+    "ZYNTALIC_ALLOW_UNAUTHENTICATED_LOCAL", "0"
+).lower() in {"1", "true", "yes", "on"}
+
+Engine = Literal["core", "transformer", "chiasmus", "test_suite", "reverse"]
+
+
+class SlidingWindowRateLimiter:
+    """Small process-local limiter for authenticated API traffic."""
+
+    def __init__(self, limit: int, window_seconds: float = 60.0) -> None:
+        self.limit = max(0, limit)
+        self.window_seconds = window_seconds
+        self._events: dict[str, deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def check(self, identity: str) -> int | None:
+        if self.limit == 0:
+            return None
+        now = time.monotonic()
+        cutoff = now - self.window_seconds
+        with self._lock:
+            events = self._events.setdefault(identity, deque())
+            while events and events[0] <= cutoff:
+                events.popleft()
+            if len(events) >= self.limit:
+                return max(1, int(self.window_seconds - (now - events[0])) + 1)
+            events.append(now)
+        return None
+
+
+api_key_header = APIKeyHeader(
+    name="X-API-Key",
+    scheme_name="ZyntalicApiKey",
+    description="API key configured by the server's ZYNTALIC_API_KEY setting.",
+    auto_error=False,
+)
+rate_limiter = SlidingWindowRateLimiter(RATE_LIMIT_PER_MINUTE)
+
+
+def require_api_access(
+    request: Request,
+    supplied_key: Annotated[str | None, Depends(api_key_header)] = None,
+) -> None:
+    """Fail closed unless a valid key or explicit loopback-only mode is active."""
+    if ALLOW_UNAUTHENTICATED_LOCAL:
+        identity = f"local:{request.client.host if request.client else 'unknown'}"
+    else:
+        if not API_KEY:
+            raise HTTPException(
+                status_code=503,
+                detail="API authentication is not configured.",
+            )
+        if supplied_key is None or not secrets.compare_digest(supplied_key, API_KEY):
+            raise HTTPException(
+                status_code=401,
+                detail="A valid X-API-Key header is required.",
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
+        identity = f"key:{hashlib.sha256(supplied_key.encode()).hexdigest()}"
+
+    retry_after = rate_limiter.check(identity)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+PROTECTED_ROUTE_DEPENDENCIES = [Depends(require_api_access)]
 
 
 def _cors_origins() -> list[str]:
@@ -86,7 +163,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=origins != ["*"],
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Request-ID"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
@@ -126,6 +203,121 @@ def _find_frontend_file(filename: str) -> Path | None:
     return None
 
 
+class ErrorResponse(BaseModel):
+    detail: str
+
+
+class RootStatusResponse(BaseModel):
+    status: Literal["ok"]
+    message: str
+
+
+class LegacyHealthResponse(BaseModel):
+    ok: bool
+
+
+class CacheStatusResponse(BaseModel):
+    backend: str
+    entries: int
+    version: int | None = None
+
+
+class ApiLimitsResponse(BaseModel):
+    text_characters: int
+    batch_items: int
+    batch_characters: int
+    upload_bytes: int
+    requests_per_minute: int
+
+
+class HealthResponse(BaseModel):
+    ok: bool
+    ready: bool
+    version: str
+    cache: CacheStatusResponse
+    limits: ApiLimitsResponse
+
+
+class SidecarResponse(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    frames: list[dict[str, Any]] = Field(default_factory=list)
+    pivot: str = "neutral"
+    anchor_weights: list[dict[str, Any]] = Field(default_factory=list)
+    anchor_mode: str | None = None
+    selected_anchors: list[str] = Field(default_factory=list)
+    sigil: str | None = None
+    sigil_type: str | None = None
+    evidentiality: str | None = None
+    register_name: str | None = Field(
+        default=None, alias="register", serialization_alias="register"
+    )
+    dialect: str | None = None
+    scope_signature: str | None = None
+    tokens: list[dict[str, Any]] | None = None
+
+
+class TranslationRowResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    source: str | None = None
+    target: str
+    engine: Engine | None = None
+    lemma: str | None = None
+    anchors: list[Any] = Field(default_factory=list)
+    embedding: list[float] | None = None
+    mirror_text: str | None = None
+    sidecar: SidecarResponse = Field(default_factory=SidecarResponse)
+    rule_warnings: list[str] | None = None
+
+
+class LegacyTranslateResponse(BaseModel):
+    rows: list[TranslationRowResponse]
+    cached: bool
+
+
+class TranslateResponse(BaseModel):
+    api_version: Literal["v1"]
+    request_id: str
+    rows: list[TranslationRowResponse]
+    cached: bool
+    processing_ms: float
+
+
+class BatchItemResponse(BaseModel):
+    index: int
+    cached: bool
+    rows: list[TranslationRowResponse]
+
+
+class TranslateBatchResponse(BaseModel):
+    api_version: Literal["v1"]
+    request_id: str
+    results: list[BatchItemResponse]
+    items: int
+    cache_hits: int
+    processing_ms: float
+
+
+class LegacyExtractResponse(BaseModel):
+    text: str
+
+
+class ExtractResponse(BaseModel):
+    api_version: Literal["v1"]
+    request_id: str
+    filename: str
+    characters: int
+    text: str
+
+
+AUTH_RESPONSES = {
+    401: {"model": ErrorResponse, "description": "Missing or invalid API key."},
+    429: {"model": ErrorResponse, "description": "Per-key rate limit exceeded."},
+    503: {"model": ErrorResponse, "description": "API authentication is not configured."},
+}
+
+
 class TranslationOptions(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -135,7 +327,7 @@ class TranslationOptions(BaseModel):
         le=1.0,
         description="Lower values produce more Zyntalic vocabulary.",
     )
-    engine: str = "core"
+    engine: Engine = "core"
     evidentiality: str = "direct"
     register_name: str = Field(default="formal", alias="register", serialization_alias="register")
     dialect: str = "standard"
@@ -151,7 +343,7 @@ class TranslateRequest(TranslationOptions):
 
 
 class TranslateBatchRequest(TranslationOptions):
-    texts: list[str] = Field(min_length=1)
+    texts: list[str] = Field(min_length=1, max_length=MAX_BATCH_ITEMS)
 
 
 def _request_payload(req: BaseModel) -> dict[str, Any]:
@@ -169,14 +361,6 @@ def _translation_options(req: TranslationOptions) -> dict[str, Any]:
         "frame_a": payload.get("frame_a", ""),
         "frame_b": payload.get("frame_b", ""),
     }
-
-
-def _validate_engine(engine: str) -> None:
-    if engine not in ALLOWED_ENGINES:
-        allowed = ", ".join(sorted(ALLOWED_ENGINES))
-        raise HTTPException(
-            status_code=422, detail=f"Unsupported engine: {engine}. Use: {allowed}."
-        )
 
 
 def _normalize_text(text: str) -> str:
@@ -206,7 +390,6 @@ def _project_rows(rows: list[dict[str, Any]], zyntalic_only: bool) -> list[dict[
 
 def _translate_one(text: str, req: TranslationOptions) -> tuple[list[dict[str, Any]], bool]:
     normalized = _normalize_text(text)
-    _validate_engine(req.engine)
     options = _translation_options(req)
 
     if USE_CACHE:
@@ -257,7 +440,7 @@ def _v1_response(
     }
 
 
-@app.get("/")
+@app.get("/", response_model=RootStatusResponse)
 def read_root():
     index_path = _find_frontend_file("index.html")
     if index_path:
@@ -372,8 +555,18 @@ async def _read_upload(file: UploadFile) -> bytes:
 
 if MULTIPART_INSTALLED:
 
-    @app.post("/upload")
-    @app.post("/v1/extract")
+    @app.post(
+        "/upload",
+        response_model=LegacyExtractResponse,
+        dependencies=PROTECTED_ROUTE_DEPENDENCIES,
+        responses=AUTH_RESPONSES,
+    )
+    @app.post(
+        "/v1/extract",
+        response_model=ExtractResponse,
+        dependencies=PROTECTED_ROUTE_DEPENDENCIES,
+        responses=AUTH_RESPONSES,
+    )
     async def upload_document(request: Request, file: UploadFile = File(...)):
         filename = (file.filename or "upload").strip()
         suffix = Path(filename).suffix.lower()
@@ -397,8 +590,18 @@ if MULTIPART_INSTALLED:
 
 else:
 
-    @app.post("/upload")
-    @app.post("/v1/extract")
+    @app.post(
+        "/upload",
+        response_model=LegacyExtractResponse,
+        dependencies=PROTECTED_ROUTE_DEPENDENCIES,
+        responses=AUTH_RESPONSES,
+    )
+    @app.post(
+        "/v1/extract",
+        response_model=ExtractResponse,
+        dependencies=PROTECTED_ROUTE_DEPENDENCIES,
+        responses=AUTH_RESPONSES,
+    )
     async def upload_document_unavailable():
         raise HTTPException(
             status_code=501,
@@ -406,12 +609,12 @@ else:
         )
 
 
-@app.get("/health")
+@app.get("/health", response_model=LegacyHealthResponse)
 def health():
     return {"ok": True}
 
 
-@app.get("/v1/health")
+@app.get("/v1/health", response_model=HealthResponse)
 def health_v1(request: Request):
     return {
         "ok": True,
@@ -423,11 +626,17 @@ def health_v1(request: Request):
             "batch_items": MAX_BATCH_ITEMS,
             "batch_characters": MAX_BATCH_CHARS,
             "upload_bytes": MAX_UPLOAD_BYTES,
+            "requests_per_minute": RATE_LIMIT_PER_MINUTE,
         },
     }
 
 
-@app.post("/translate")
+@app.post(
+    "/translate",
+    response_model=LegacyTranslateResponse,
+    dependencies=PROTECTED_ROUTE_DEPENDENCIES,
+    responses=AUTH_RESPONSES,
+)
 def translate(req: TranslateRequest):
     """Backward-compatible translation endpoint used by the current UI."""
     try:
@@ -440,7 +649,12 @@ def translate(req: TranslateRequest):
         raise HTTPException(status_code=500, detail="Translation failed.") from exc
 
 
-@app.post("/v1/translate")
+@app.post(
+    "/v1/translate",
+    response_model=TranslateResponse,
+    dependencies=PROTECTED_ROUTE_DEPENDENCIES,
+    responses=AUTH_RESPONSES,
+)
 def translate_v1(request: Request, req: TranslateRequest):
     started = time.perf_counter()
     try:
@@ -453,22 +667,21 @@ def translate_v1(request: Request, req: TranslateRequest):
         raise HTTPException(status_code=500, detail="Translation failed.") from exc
 
 
-@app.post("/v1/translate/batch")
+@app.post(
+    "/v1/translate/batch",
+    response_model=TranslateBatchResponse,
+    dependencies=PROTECTED_ROUTE_DEPENDENCIES,
+    responses=AUTH_RESPONSES,
+)
 def translate_batch_v1(request: Request, req: TranslateBatchRequest):
+    """Translate inputs in order and sequentially within the current worker."""
     started = time.perf_counter()
-    if len(req.texts) > MAX_BATCH_ITEMS:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Batch too large (>{MAX_BATCH_ITEMS} items).",
-        )
     total_characters = sum(len(text or "") for text in req.texts)
     if total_characters > MAX_BATCH_CHARS:
         raise HTTPException(
             status_code=413,
             detail=f"Batch too large (>{MAX_BATCH_CHARS} characters).",
         )
-    _validate_engine(req.engine)
-
     results = []
     cache_hits = 0
     try:

@@ -2,13 +2,17 @@
 
 from fastapi.testclient import TestClient
 
-from apps.web.app import app
+import apps.web.app as web_app
+from apps.web.app import SlidingWindowRateLimiter, app
 
 
-def test_api_translation_connection():
+def test_api_translation_connection(monkeypatch):
+    monkeypatch.setattr(web_app, "API_KEY", "test-api-key")
+    monkeypatch.setattr(web_app, "rate_limiter", SlidingWindowRateLimiter(1000))
     with TestClient(app) as client:
         response = client.post(
             "/translate",
+            headers={"X-API-Key": "test-api-key"},
             json={
                 "text": "The quick brown fox jumps over the lazy dog.",
                 "mirror_rate": 0.3,

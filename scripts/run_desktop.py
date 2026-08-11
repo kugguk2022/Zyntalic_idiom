@@ -1,11 +1,15 @@
 import os
+import platform
+import socket
 import sys
 import threading
 import time
 import webbrowser
-import socket
-import platform
 from pathlib import Path
+
+# The bundled UI has no place to enter a key. Permit its legacy requests only
+# because this launcher binds the server to the loopback interface below.
+os.environ.setdefault("ZYNTALIC_ALLOW_UNAUTHENTICATED_LOCAL", "1")
 
 # Ensure repo root is on sys.path so we can import apps/zyntalic
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -17,7 +21,7 @@ try:
 except ImportError:
     uvicorn = None
 
-from apps.web.app import app
+from apps.web.app import app  # noqa: E402 - local-only mode must be set before app import
 
 REQ_PY_LIBS = {
     "pypdf": "pypdf is required for PDF uploads. Install with: python -m pip install -e '.[pdf]'",
@@ -63,7 +67,7 @@ def ensure_port_available(host: str, port: int) -> None:
 
 
 PORT = 8001
-HOST = "0.0.0.0"
+HOST = "127.0.0.1"
 
 
 def start_server():
@@ -106,7 +110,7 @@ def start_desktop():
     # Wait for the server to be ready
     wait_for_server("127.0.0.1", PORT, timeout=10)
 
-    # Use localhost for the browser, even if we bind to 0.0.0.0 (all interfaces)
+    # Keep the desktop-only authentication override isolated to loopback.
     browser_url = f"http://127.0.0.1:{PORT}"
     print(f"Opening Zyntalic at {browser_url}")
 
