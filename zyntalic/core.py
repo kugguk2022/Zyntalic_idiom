@@ -182,6 +182,7 @@ ANCHORS = [
 # -------------------- Lexicon Prior --------------------
 _LEXICON_CACHE: Optional[Dict[str, dict]] = None
 _VOCAB_MAPPINGS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
+_STRICT_VOCAB_POOL_CACHE: Dict[str, List[str]] = {}
 _PROJECTION_CACHE_SENTINEL = object()
 _PROJECTION_CACHE = _PROJECTION_CACHE_SENTINEL
 _VOCAB_EMB_CACHE: Dict[str, List[List[float]]] = {}
@@ -735,6 +736,17 @@ def _stable_pick(values: Iterable[str], seed: str) -> Optional[str]:
     return vals[int(rng.random() * len(vals))]
 
 
+def _strict_vocab_pool(field: str, vocab_mappings) -> List[str]:
+    """Return tracked vocabulary values that satisfy the visible-surface contract."""
+    if field in _STRICT_VOCAB_POOL_CACHE:
+        return _STRICT_VOCAB_POOL_CACHE[field]
+
+    values = list(vocab_mappings.get(field, {}).values())
+    compatible = [value for value in values if _surface_profile_ok(value, field)]
+    _STRICT_VOCAB_POOL_CACHE[field] = compatible or values
+    return _STRICT_VOCAB_POOL_CACHE[field]
+
+
 def _surface_script_counts(text: str) -> Dict[str, int]:
     counts = {"hangul": 0, "latin": 0}
     for ch in text or "":
@@ -805,9 +817,14 @@ def _map_term_to_zyntalic(
     if vocab_mappings is None:
         vocab_mappings = load_vocabulary_mappings()
     key = (term or "").strip().lower()
+    strict_pool = _strict_vocab_pool(field, vocab_mappings) if _STRICT_VOCAB else []
     mapped = vocab_mappings.get(field, {}).get(key)
     if mapped:
-        return _repair_surface_profile(mapped, field, f"{field}::{key}")
+        if not _STRICT_VOCAB or _surface_profile_ok(mapped, field):
+            return _repair_surface_profile(mapped, field, f"{field}::{key}")
+        pick = _stable_pick(strict_pool, f"{field}::{key}")
+        if pick:
+            return pick
 
     # Try semantic nearest neighbor among vocabulary keys if embeddings are available.
     emb_pack = _get_vocab_embeddings(field, vocab_mappings)
@@ -818,22 +835,28 @@ def _map_term_to_zyntalic(
             best_i = 0
             best = -1.0
             for i, v in enumerate(vecs):
-                s = _cosine(q, v)
+                # Both vectors are normalized when cached, so the dot product
+                # is the cosine score without recalculating two norms for each
+                # vocabulary candidate.
+                s = _dot(q, v)
                 if s > best:
                     best = s
                     best_i = i
             match = keys[best_i]
             mapped = vocab_mappings.get(field, {}).get(match)
             if mapped:
-                return _repair_surface_profile(mapped, field, f"{field}::{key}")
+                if not _STRICT_VOCAB or _surface_profile_ok(mapped, field):
+                    return _repair_surface_profile(mapped, field, f"{field}::{key}")
+                pick = _stable_pick(strict_pool, f"{field}::{key}")
+                if pick:
+                    return pick
         except Exception:
             pass
 
     if _STRICT_VOCAB:
-        values = list(vocab_mappings.get(field, {}).values())
-        pick = _stable_pick(values, f"{field}::{key}") if values else None
+        pick = _stable_pick(strict_pool, f"{field}::{key}")
         if pick:
-            return _repair_surface_profile(pick, field, f"{field}::{key}")
+            return pick
     return generate_word(f"{field}::{key}")
 
 
