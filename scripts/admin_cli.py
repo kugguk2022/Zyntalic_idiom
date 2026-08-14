@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Unified admin CLI for Zyntalic utilities."""
 
 from __future__ import annotations
@@ -22,9 +21,13 @@ def check_port(host: str, port: int) -> bool:
 def check_server_running(port: int) -> bool:
     try:
         if sys.platform == "win32":
-            result = subprocess.run(["netstat", "-ano"], capture_output=True, text=True, check=False)
+            result = subprocess.run(
+                ["netstat", "-ano"], capture_output=True, text=True, check=False
+            )
             return f":{port}" in result.stdout and "LISTENING" in result.stdout
-        result = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"], capture_output=True, text=True, check=False
+        )
         return bool(result.stdout.strip())
     except Exception:
         return False
@@ -37,7 +40,7 @@ def check_frontend_built() -> bool:
 
 
 def check_dependencies():
-    required = ("fastapi", "uvicorn", "PyPDF2")
+    required = ("fastapi", "uvicorn", "pypdf")
     missing = []
     for mod in required:
         try:
@@ -60,7 +63,9 @@ def test_api(url: str) -> bool:
 def kill_port(port: int) -> None:
     try:
         if sys.platform == "win32":
-            result = subprocess.run(["netstat", "-ano"], capture_output=True, text=True, check=False)
+            result = subprocess.run(
+                ["netstat", "-ano"], capture_output=True, text=True, check=False
+            )
             for line in result.stdout.splitlines():
                 if f":{port}" in line and "LISTENING" in line:
                     parts = line.split()
@@ -68,7 +73,9 @@ def kill_port(port: int) -> None:
                     subprocess.run(["taskkill", "/F", "/PID", pid], check=False)
                     time.sleep(1)
         else:
-            result = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True, check=False)
+            result = subprocess.run(
+                ["lsof", "-ti", f":{port}"], capture_output=True, text=True, check=False
+            )
             for pid in result.stdout.strip().split("\n"):
                 if pid:
                     subprocess.run(["kill", "-9", pid], check=False)
@@ -131,7 +138,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     print("SUMMARY")
     print("=" * 70)
 
-    ok = server_running and frontend_built and deps_ok and (test_api(args.health_url) if server_running else True)
+    ok = (
+        server_running
+        and frontend_built
+        and deps_ok
+        and (test_api(args.health_url) if server_running else True)
+    )
     if ok:
         print("✅ All systems operational!")
         print()

@@ -6,37 +6,38 @@ Diagnoses common issues and provides fixes
 
 import subprocess
 import sys
-import os
-import json
 from pathlib import Path
-from urllib import request, error
+from urllib import request
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
 
 def check_server_running():
     """Check if server is running on port 8001."""
     try:
-        if sys.platform == 'win32':
-            result = subprocess.run(['netstat', '-ano'], capture_output=True, text=True)
-            return ':8001' in result.stdout and 'LISTENING' in result.stdout
+        if sys.platform == "win32":
+            result = subprocess.run(["netstat", "-ano"], capture_output=True, text=True)
+            return ":8001" in result.stdout and "LISTENING" in result.stdout
         else:
-            result = subprocess.run(['lsof', '-ti', ':8001'], capture_output=True, text=True)
+            result = subprocess.run(["lsof", "-ti", ":8001"], capture_output=True, text=True)
             return bool(result.stdout.strip())
-    except:
+    except Exception:
         return False
+
 
 def check_frontend_built():
     """Check if frontend is built."""
-    dist_path = REPO_ROOT / 'zyntalic-flow' / 'dist'
-    assets_path = dist_path / 'assets'
+    dist_path = REPO_ROOT / "zyntalic-flow" / "dist"
+    assets_path = dist_path / "assets"
     return assets_path.exists() and any(assets_path.iterdir())
+
 
 def check_dependencies():
     """Check if key dependencies are installed.
 
     Returns (ok, message). Message is empty on success.
     """
-    required = ("fastapi", "uvicorn", "PyPDF2")
+    required = ("fastapi", "uvicorn", "pypdf")
     missing = []
     for mod in required:
         try:
@@ -47,6 +48,7 @@ def check_dependencies():
         return False, f"Missing dependencies: {', '.join(missing)}"
     return True, ""
 
+
 def test_api():
     """Test if API is responding using stdlib only."""
     try:
@@ -54,6 +56,7 @@ def test_api():
         return resp.status == 200
     except Exception:
         return False
+
 
 def main():
     print("=" * 70)
@@ -106,7 +109,7 @@ def main():
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)
-    
+
     if server_running and frontend_built and deps_ok and (test_api() if server_running else True):
         print("✅ All systems operational!")
         print()
@@ -118,8 +121,9 @@ def main():
         print("  • Context tail only shows Korean markers (no anchor clutter)")
     else:
         print("⚠️  Some issues detected. See fixes above.")
-    
+
     print("=" * 70)
+
 
 if __name__ == "__main__":
     main()

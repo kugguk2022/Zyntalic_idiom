@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Extract text from raw files into a flat text corpus directory.
 
 Supports:
 - .txt (passthrough)
-- .pdf (if PyPDF2 is installed)
+- .pdf (if pypdf is installed)
 """
 
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 try:
-    import PyPDF2  # type: ignore
+    import pypdf  # type: ignore
+
     HAS_PDF = True
 except Exception:
     HAS_PDF = False
@@ -32,7 +32,7 @@ def extract_pdf(path: Path) -> str:
         return ""
     text_parts = []
     with path.open("rb") as f:
-        reader = PyPDF2.PdfReader(f)
+        reader = pypdf.PdfReader(f)
         for page in reader.pages:
             try:
                 text_parts.append(page.extract_text() or "")
@@ -70,7 +70,9 @@ def main() -> int:
         print(f"[skip] Unsupported file type: {path}")
 
     if not HAS_PDF:
-        print("Note: PyPDF2 not installed; PDF extraction skipped. Install with: pip install -e .[pdf]")
+        print(
+            "Note: pypdf not installed; PDF extraction skipped. Install with: pip install -e .[pdf]"
+        )
 
     return 0
 
