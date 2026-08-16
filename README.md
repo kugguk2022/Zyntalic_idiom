@@ -117,6 +117,24 @@ curl --fail-with-body http://127.0.0.1:8000/v1/translate \
 
 The in-process rate limiter is suitable for one server process. Multi-worker and distributed deployments should enforce shared limits at a gateway. Configure limits, CORS, cache location, and authentication through the variables documented in [.env.example](.env.example).
 
+## Deployment
+
+The container builds the React frontend and serves it from the API in one image:
+
+```bash
+export ZYNTALIC_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export ZYNTALIC_CORS_ORIGINS="https://your-domain"
+docker compose -f docker/compose.yaml up -d --build
+```
+
+The service binds to `127.0.0.1:8000`. Terminate TLS and enforce the public rate
+limit in a reverse proxy in front of it, because the built-in limiter keeps
+counters in process memory and the image runs a single worker on purpose. The
+translation cache is SQLite on a named volume, so redeploys keep warm results;
+bump `ZYNTALIC_CACHE_VERSION` whenever translation semantics change.
+
+Never set `ZYNTALIC_ALLOW_UNAUTHENTICATED_LOCAL=1` on a network-facing host.
+
 ## Development
 
 ```bash

@@ -1,0 +1,41 @@
+# Production-shaped stack for alienway.fun.
+#
+# The service binds to loopback only: terminate TLS and enforce the public rate
+# limit in a reverse proxy on the host, then forward to 127.0.0.1:8000.
+#
+#   ZYNTALIC_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" \
+#     docker compose -f docker/compose.yaml up -d --build
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: zyntalic:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Required. The app fails closed with 503 if this is unset.
+      ZYNTALIC_API_KEY: ${ZYNTALIC_API_KEY:?set ZYNTALIC_API_KEY before starting}
+      # Never enable on a network-facing deployment.
+      ZYNTALIC_ALLOW_UNAUTHENTICATED_LOCAL: "0"
+      ZYNTALIC_CORS_ORIGINS: ${ZYNTALIC_CORS_ORIGINS:-https://alienway.fun}
+      ZYNTALIC_RATE_LIMIT_PER_MINUTE: ${ZYNTALIC_RATE_LIMIT_PER_MINUTE:-60}
+      ZYNTALIC_MAX_TEXT_CHARS: "20000"
+      ZYNTALIC_MAX_BATCH_ITEMS: "32"
+      ZYNTALIC_MAX_UPLOAD_BYTES: "10485760"
+      ZYNTALIC_USE_CACHE: "1"
+      # Bump after any change to translation semantics.
+      ZYNTALIC_CACHE_VERSION: ${ZYNTALIC_CACHE_VERSION:-2}
+      ZYNTALIC_CACHE_PATH: /data/zyntalic/translations.sqlite3
+    volumes:
+      - zyntalic-cache:/data/zyntalic
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  zyntalic-cache:
