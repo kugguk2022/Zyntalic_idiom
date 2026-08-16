@@ -32,6 +32,31 @@ The baseline runs locally with NumPy. Embeddings, NLP, PDF extraction, the web A
 
 Read [the idea](wiki/idea.md), [core concepts](wiki/core-concepts.md), and the honest [current-state inventory](wiki/current-state.md) for the full project context.
 
+## Install
+
+Zyntalic is not on PyPI yet. Install it directly from GitHub:
+
+```bash
+# Latest tagged release
+python -m pip install "zyntalic @ https://github.com/kugguk2022/Zyntalic_idiom/releases/latest/download/zyntalic-0.3.0-py3-none-any.whl"
+
+# Or track the main branch
+python -m pip install "git+https://github.com/kugguk2022/Zyntalic_idiom.git"
+```
+
+Optional extras follow the same form, for example
+`python -m pip install "zyntalic[web,pdf] @ git+https://github.com/kugguk2022/Zyntalic_idiom.git"`.
+
+> [!NOTE]
+> On Windows, set `PYTHONIOENCODING=utf-8` before using the CLI. Zyntalic output
+> contains Hangul and diacritics that the default `cp1252` console encoding
+> cannot represent.
+
+Tagged releases are built and attached automatically by
+[the release workflow](.github/workflows/release.yml), which verifies that the
+tag matches the packaged version and that the wheel imports and translates from
+a clean environment before publishing.
+
 ## Quick start
 
 ### Python and CLI
