@@ -1,4 +1,5 @@
 import { TranslationConfig, TranslationResult } from "../types";
+import { apiKeyHeaders } from "./apiKey";
 
 const DEFAULT_LOCAL_API_PORTS = ["8001", "8000"];
 
@@ -36,6 +37,7 @@ const postJsonWithFallback = async (path: string, body: object): Promise<Respons
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...apiKeyHeaders(),
         },
         body: JSON.stringify(body),
       });
@@ -43,6 +45,11 @@ const postJsonWithFallback = async (path: string, body: object): Promise<Respons
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         const detail = (payload as any).detail || response.statusText;
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(
+            `${detail} Set your API key in Settings, or start the server in local mode.`
+          );
+        }
         throw new Error(`${baseUrl}${path} -> ${detail}`);
       }
 

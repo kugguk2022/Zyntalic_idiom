@@ -1,5 +1,6 @@
 import React from 'react';
 import { AnchorMode, TranslationEngine, TranslationConfig } from '../types';
+import { getApiKey, setApiKey } from '../services/apiKey';
 
 interface SettingsBarProps {
   config: TranslationConfig;
@@ -141,6 +142,7 @@ const SettingsBar: React.FC<SettingsBarProps> = ({ config, onChange }) => {
   const anchorFileInputRef = React.useRef<HTMLInputElement>(null);
   const [anchorToAdd, setAnchorToAdd] = React.useState('');
   const [anchorStatus, setAnchorStatus] = React.useState<string | null>(null);
+  const [apiKey, setApiKeyState] = React.useState(() => getApiKey());
 
   const availableAnchors = ANCHORS.filter((anchor) => !config.selectedAnchors.includes(anchor));
 
@@ -422,6 +424,31 @@ const SettingsBar: React.FC<SettingsBarProps> = ({ config, onChange }) => {
             </p>
           )}
         </div>
+      </div>
+
+      <div className="space-y-4">
+        <label
+          htmlFor="zyntalic-api-key"
+          className="text-xs font-bold text-slate-400 uppercase tracking-widest block"
+        >
+          API Access
+        </label>
+        <input
+          id="zyntalic-api-key"
+          type="password"
+          value={apiKey}
+          onChange={(event) => {
+            setApiKeyState(event.target.value);
+            setApiKey(event.target.value);
+          }}
+          placeholder="X-API-Key (leave blank for local mode)"
+          autoComplete="off"
+          spellCheck={false}
+          className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-lg px-3 py-2 text-sm mono focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+        />
+        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">
+          Required when the server sets ZYNTALIC_API_KEY. Stored in this browser only.
+        </p>
       </div>
     </div>
   );
