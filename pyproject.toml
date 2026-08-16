@@ -11,15 +11,35 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "zolton" }]
 keywords = ["synthetic-language", "conlang", "translation", "schelling-points", "deterministic"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Artistic Software",
+  "Topic :: Text Processing :: Linguistic",
+]
 dependencies = [
   "numpy>=1.24.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/kugguk2022/Zyntalic_idiom"
+Documentation = "https://github.com/kugguk2022/Zyntalic_idiom/tree/main/wiki"
+Issues = "https://github.com/kugguk2022/Zyntalic_idiom/issues"
+Source = "https://github.com/kugguk2022/Zyntalic_idiom"
 
 [project.scripts]
 zyntalic = "zyntalic.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0.0", "ruff>=0.5.0", "pytest-cov>=5.0.0", "hypothesis>=6.100.0", "coverage>=7.5.0", "httpx2>=2.0.0"]
+dev = ["pytest>=8.0.0", "ruff>=0.5.0", "pytest-cov>=5.0.0", "hypothesis>=6.100.0", "coverage>=7.5.0", "httpx>=0.27.0"]
 web = ["fastapi>=0.110.0", "uvicorn[standard]>=0.29.0", "pydantic>=2.0.0", "python-multipart>=0.0.9"]
 embeddings = ["sentence-transformers>=2.6.0"]
 embeddings-bge = ["sentence-transformers>=2.6.0"]
@@ -37,7 +57,7 @@ zyntalic = ["resources/lexicon/*.json"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP"]

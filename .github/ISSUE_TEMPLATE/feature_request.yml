@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose a concrete improvement to the engine or workflow.
+title: "feat: "
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: Describe the user need before describing a solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should Zyntalic do, and through which interface?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - Core language engine
+        - CLI or Python API
+        - REST API
+        - Frontend or desktop
+        - Data or lexicon
+        - Documentation
+        - Developer experience
+    validations:
+      required: true
+  - type: textarea
+    id: determinism
+    attributes:
+      label: Determinism and compatibility
+      description: Could this alter output, sidecars, cache keys, or API responses?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and the roadmap.
+          required: true
+        - label: I distinguished proposed behavior from shipped behavior.
+          required: true

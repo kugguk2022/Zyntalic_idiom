@@ -1,0 +1,53 @@
+name: Bug report
+description: Report reproducible incorrect behavior in Zyntalic.
+title: "bug: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, private text, or security vulnerabilities. Report vulnerabilities through the Security tab.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Include the exact command, Python snippet, or HTTP request and the smallest safe input.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: 0.3.0 or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Windows 11, Python 3.11, editable install
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant sanitized output
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I removed secrets and private data.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

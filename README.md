@@ -1,146 +1,153 @@
 # Zyntalic
 
 <p align="center">
-  <img src="zyntalic-flow/public/favicon (3).svg" alt="Zyntalic logo" width="600">
+  <img src="zyntalic-flow/public/favicon.svg" alt="Zyntalic logo" width="360">
 </p>
 
-A deterministic **synthetic-language toolkit** (conlang engine) that maps input text to a stable “Zyntalic” surface form using:
+<p align="center">
+  <strong>A deterministic synthetic-language engine for reproducible creative text.</strong>
+</p>
 
-- deterministic word generation (seeded by text)
-- **anchor priors** (“Schelling points”) via bundled lexicons
-- **S-O-V-C** ordering with an explicit **context tail** (`⟦ctx: ...⟧`)
+<p align="center">
+  <a href="https://github.com/kugguk2022/Zyntalic_idiom/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/kugguk2022/Zyntalic_idiom/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB.svg">
+  <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-orange.svg">
+</p>
 
-This repo is intentionally lightweight: it runs with only NumPy, and upgrades automatically if you install optional extras.
+Zyntalic maps source text to a stable constructed-language surface using seeded word generation, literary anchor priors, mixed Hangul/Latin forms, and Subject–Object–Verb–Context (S-O-V-C) ordering. Each non-reverse result ends with a machine-readable `⟦ctx: ...⟧` trace.
 
-## Install
+The baseline runs locally with NumPy. Embeddings, NLP, PDF extraction, the web API, and desktop integration are optional.
 
-Fastest way of running the repo: 
+> [!IMPORTANT]
+> Zyntalic is experimental. Output stability is a design goal within a fixed code and resource version, not a permanent compatibility guarantee. Record the package version and generation options with production assets.
 
-```
-run_desktop.bat
-```
+## Why Zyntalic?
 
-Typical way:
+- **Repeatable:** stable seeded generation supports revision and regeneration.
+- **Inspectible:** anchors, frames, sigils, scope, and warnings are available as structured metadata.
+- **Rule-first:** the core works without a hosted model or heavyweight NLP stack.
+- **Controllable:** anchor mode, frames, register, dialect, evidentiality, engine, and mirror rate are explicit options.
+- **Integrable:** use the Python API, CLI, authenticated REST API, React interface, or desktop launcher.
+
+Read [the idea](wiki/idea.md), [core concepts](wiki/core-concepts.md), and the honest [current-state inventory](wiki/current-state.md) for the full project context.
+
+## Quick start
+
+### Python and CLI
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install -e .
+
+zyntalic translate "I see the river at night." --format plain
 ```
 
-Optional:
-- Web API: `pip install -e ".[web]"`
-- Better embeddings: `pip install -e ".[embeddings]"`
-- Desktop/web app: `pip install -e ".[web,pdf,desktop]"`
+From Python:
 
-# Running tests
-```bash
-pytest -q
+```python
+from zyntalic.translator import translate_sentence
+
+result = translate_sentence("I see the river at night.", engine="core", mirror_rate=0.3)
+print(result["target"])
+print(result["sidecar"])
 ```
 
-Demo only (does not replace pytest):
-```bash
-python3 -c "from zyntalic.test_suite import demo_test_suite; demo_test_suite()"
-```
-## CLI
+### Desktop experience
 
-Translate a sentence:
+On Windows, run `run_desktop.bat`. On any supported platform with the optional dependencies installed:
 
 ```bash
-zyntalic translate "Hello world" --format plain
+python -m pip install -e ".[web,pdf,desktop]"
+python -m scripts.run_desktop
 ```
 
-JSONL output (good for pipelines):
+The desktop launcher binds to localhost and explicitly enables local unauthenticated mode. Do not use that override on a network-facing deployment.
+
+## REST API
+
+Install and start the authenticated API:
 
 ```bash
-zyntalic translate "I see the river at night." --format jsonl
-```
-
-## Web API (optional)
-
-```bash
-pip install -e ".[web]"
+python -m pip install -e ".[web,pdf]"
 export ZYNTALIC_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-uvicorn apps.web.app:app --reload --port 8000
+uvicorn apps.web.app:app --host 127.0.0.1 --port 8000
 ```
 
-- `GET /health` and `POST /translate` remain compatible with the desktop UI.
-- `GET /v1/health` reports readiness, limits, version, and cache status.
-- `POST /v1/translate` adds a request ID and processing time.
-- `POST /v1/translate/batch` translates up to 32 independent inputs per request, in
-  input order and sequentially within one worker. Batch latency is therefore the
-  sum of its item latencies; the endpoint does not promise parallel execution.
-- `POST /v1/extract` extracts UTF-8 text from PDF, TXT, or Markdown uploads.
-- Interactive OpenAPI documentation is available at `/docs`.
-
-Translation and extraction routes fail closed unless `ZYNTALIC_API_KEY` is set.
-Send it in `X-API-Key`; health, documentation, and static assets remain public.
-The default per-key limit is 60 requests per minute and can be adjusted with
-`ZYNTALIC_RATE_LIMIT_PER_MINUTE` (`0` disables the limiter). The in-process
-limiter is suitable for one server process; multi-worker or distributed
-deployments should enforce a shared limit at the gateway as well.
-
-The desktop launcher is the only unauthenticated mode supplied by the project.
-It explicitly enables `ZYNTALIC_ALLOW_UNAUTHENTICATED_LOCAL=1` and binds to
-`127.0.0.1`. Never enable that override on a network-facing deployment.
-
-Example:
-
 ```bash
-curl -s http://127.0.0.1:8000/v1/translate \
-  -H 'content-type: application/json' \
+curl --fail-with-body http://127.0.0.1:8000/v1/translate \
+  -H 'Content-Type: application/json' \
   -H "X-API-Key: $ZYNTALIC_API_KEY" \
   -d '{"text":"I see the river at night.","engine":"core","mirror_rate":0.3}'
 ```
 
-The inherited test failures excluded from PR #8 validation are tracked in
-[#9](https://github.com/kugguk2022/Zyntalic_idiom/issues/9); deselection is not
-their acceptance criterion.
+| Endpoint | Purpose | Authentication |
+| --- | --- | --- |
+| `GET /v1/health` | Readiness, limits, version, and cache status | Public |
+| `POST /v1/translate` | Translate one input with request metadata | API key |
+| `POST /v1/translate/batch` | Translate up to 32 ordered inputs | API key |
+| `POST /v1/extract` | Extract UTF-8 text from PDF, TXT, or Markdown | API key |
+| `GET /docs` | Interactive OpenAPI reference | Public |
 
-The server uses a concurrent SQLite WAL cache instead of rewriting one JSON
-file for every sentence. Set `ZYNTALIC_CACHE_PATH` when deployments need a
-persistent volume, or `ZYNTALIC_USE_CACHE=0` to disable it.
+The in-process rate limiter is suitable for one server process. Multi-worker and distributed deployments should enforce shared limits at a gateway. Configure limits, CORS, cache location, and authentication through the variables documented in [.env.example](.env.example).
 
-## Desktop/Web launcher
-
-### Quick Start (Windows)
-
-- Double-click or run: `run_desktop.bat`
-  - This sets `ZYNTALIC_MAX_TEXT_CHARS=100000000` and launches the desktop app.
-
-### Other launchers
-
-- Windows (cmd/PowerShell): `scripts\start_server.bat`
-- Bash/WSL: `chmod +x scripts/start_server.sh && scripts/start_server.sh`
-- Direct Python (any shell): `python -m scripts.run_desktop`
-
-The launchers check port 8001 before starting and then open the bundled UI.
-
-## Projection training (optional)
-
-There’s a simple projection trainer that produces `models/W.npy` + `models/meta.json`:
+## Development
 
 ```bash
-python scripts/train_projection.py --anchors data/anchors.tsv --method procrustes --out models
+python -m pip install -e ".[dev,web,pdf]"
+ruff check .
+pytest
 ```
 
-## Repo layout
+The project has three inherited regression failures tracked in [issue #9](https://github.com/kugguk2022/Zyntalic_idiom/issues/9). CI runs the remainder as a required suite and reports those cases separately; deselection is not their acceptance criterion.
 
-```
-Zyntalic/
-  apps/        # CLI + web API wrappers
-  zyntalic/    # core library (deterministic)
-  evals/       # tests / regression checks
-  tests/       # user-facing tests
-  data/        # small fixtures only
-  scripts/     # operational utilities and launchers
+Frontend development:
+
+```bash
+cd zyntalic-flow
+npm ci
+npm run build
 ```
 
-## Notes
+See [CONTRIBUTING.md](CONTRIBUTING.md) for environment setup, test selection, deterministic-change review, and pull-request expectations.
 
-- This is a **toolkit**, not a linguistics-perfect parser. The English parsing is a stable heuristic to enforce S-O-V-C and is designed to avoid heavy dependencies.
-- All fixtures are either tiny examples or public-domain-ish excerpts; don’t commit any PII to `data/`.
+## Project structure
+
+```text
+apps/                  Application adapters, including the FastAPI service
+data/                  Small fixtures and anchor inputs
+data_generation/       Corpus acquisition and transformation pipeline
+docker/                Container build definition
+evals/                 Evaluation and smoke checks
+lexicon/               Checkout/runtime literary lexicons
+scripts/               Operational, training, and maintenance commands
+tests/                 Primary automated test suite
+wiki/                  Product idea, history, architecture, and roadmap
+zyntalic/              Installable Python engine
+zyntalic_docs/         Generated language-design reference
+zyntalic-flow/         React/Vite frontend
+```
+
+The [repository guide](wiki/repository-guide.md) defines ownership, safe cleanup practices, legacy directories, and generated artifacts.
+
+## Documentation
+
+- [Project wiki](wiki/README.md)
+- [Architecture](wiki/architecture.md)
+- [Language reference](zyntalic_docs/README.md)
+- [Dataset pipeline](DATASET.md)
+- [Embeddings](EMBEDDINGS.md)
+- [Roadmap](wiki/roadmap.md)
+- [Changelog](CHANGELOG.md)
+- [Security policy](SECURITY.md)
+
+## Scope and limitations
+
+Zyntalic is a creative toolkit, not a linguistically complete English parser or a translation system for a naturally spoken language. The default parser intentionally uses stable heuristics. The generated language reference contains design material that should be backed by executable tests before being treated as a compatibility guarantee.
+
+Corpus and fixture contributions must be redistributable and must not contain personal or confidential information. See [CONTRIBUTING.md](CONTRIBUTING.md#data-and-lexicon-contributions).
 
 ## License
 
-MIT.
+Released under the [MIT License](LICENSE).
