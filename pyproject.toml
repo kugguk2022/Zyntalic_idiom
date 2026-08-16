@@ -61,7 +61,10 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP"]
-ignore = ["E501"]
+# N803/N806: linear-algebra notation (projection matrix `W`, vectors `A`/`B`/`Z`)
+# is intentional in the embedding and mirror code, and `W=` is a keyword argument
+# across module boundaries, so renaming would be a breaking API change.
+ignore = ["E501", "N803", "N806"]
 
 [tool.pytest.ini_options]
 testpaths = ["evals", "tests"]
