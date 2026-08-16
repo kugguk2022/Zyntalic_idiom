@@ -1,12 +1,28 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import argparse
 import json
 import sys
-from typing import Optional
 
 from .translator import translate_text
+
+
+def _force_utf8_streams() -> None:
+    """Zyntalic output is always non-ASCII, so narrow console encodings must not decide it.
+
+    A default Windows console reports cp1252, which cannot encode Hangul or the
+    Latin diacritics every target string carries; writing one raises
+    UnicodeEncodeError before any output reaches the user.
+    """
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:  # pragma: no cover - redirected or replaced stream
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except (ValueError, OSError):  # pragma: no cover - stream refuses reconfiguration
+            continue
+
 
 def _read_stdin() -> str:
     return sys.stdin.read()
@@ -49,7 +65,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     return p
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
+    _force_utf8_streams()
     parser = build_parser()
     args = parser.parse_args(argv)
     return int(args.func(args))

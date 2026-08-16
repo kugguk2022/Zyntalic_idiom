@@ -32,6 +32,31 @@ The baseline runs locally with NumPy. Embeddings, NLP, PDF extraction, the web A
 
 Read [the idea](wiki/idea.md), [core concepts](wiki/core-concepts.md), and the honest [current-state inventory](wiki/current-state.md) for the full project context.
 
+## Install
+
+Zyntalic is not on PyPI yet. Install it directly from GitHub:
+
+```bash
+# Latest tagged release
+python -m pip install "zyntalic @ https://github.com/kugguk2022/Zyntalic_idiom/releases/latest/download/zyntalic-0.3.0-py3-none-any.whl"
+
+# Or track the main branch
+python -m pip install "git+https://github.com/kugguk2022/Zyntalic_idiom.git"
+```
+
+Optional extras follow the same form, for example
+`python -m pip install "zyntalic[web,pdf] @ git+https://github.com/kugguk2022/Zyntalic_idiom.git"`.
+
+> [!NOTE]
+> On Windows, set `PYTHONIOENCODING=utf-8` before using the CLI. Zyntalic output
+> contains Hangul and diacritics that the default `cp1252` console encoding
+> cannot represent.
+
+Tagged releases are built and attached automatically by
+[the release workflow](.github/workflows/release.yml), which verifies that the
+tag matches the packaged version and that the wheel imports and translates from
+a clean environment before publishing.
+
 ## Quick start
 
 ### Python and CLI
@@ -91,6 +116,24 @@ curl --fail-with-body http://127.0.0.1:8000/v1/translate \
 | `GET /docs` | Interactive OpenAPI reference | Public |
 
 The in-process rate limiter is suitable for one server process. Multi-worker and distributed deployments should enforce shared limits at a gateway. Configure limits, CORS, cache location, and authentication through the variables documented in [.env.example](.env.example).
+
+## Deployment
+
+The container builds the React frontend and serves it from the API in one image:
+
+```bash
+export ZYNTALIC_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export ZYNTALIC_CORS_ORIGINS="https://your-domain"
+docker compose -f docker/compose.yaml up -d --build
+```
+
+The service binds to `127.0.0.1:8000`. Terminate TLS and enforce the public rate
+limit in a reverse proxy in front of it, because the built-in limiter keeps
+counters in process memory and the image runs a single worker on purpose. The
+translation cache is SQLite on a named volume, so redeploys keep warm results;
+bump `ZYNTALIC_CACHE_VERSION` whenever translation semantics change.
+
+Never set `ZYNTALIC_ALLOW_UNAUTHENTICATED_LOCAL=1` on a network-facing host.
 
 ## Development
 

@@ -1,0 +1,39 @@
+# Secrets must never enter a build layer. .env is gitignored but that does not
+# stop COPY, so it has to be excluded here as well.
+.env
+.env.*
+!.env.example
+
+# Version control and CI
+.git
+.gitignore
+.github
+.codex
+
+# Dependencies and build output, all reproduced inside the image
+node_modules
+**/node_modules
+zyntalic-flow/dist
+.venv
+.venv*/
+dist/
+build/
+*.egg-info
+
+# Caches and local scratch
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.hypothesis
+.ruff_cache
+.vscode
+data/cache
+
+# Not needed at runtime
+tests
+evals
+unittests
+huggingface
+wiki
+zyntalic_docs
+zyntalic-flow/README.md

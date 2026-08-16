@@ -1,0 +1,2 @@
+gradio>=5.0,<6.0
+zyntalic @ git+https://github.com/kugguk2022/Zyntalic_idiom.git@main

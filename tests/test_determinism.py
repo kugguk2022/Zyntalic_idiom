@@ -4,6 +4,11 @@ from hypothesis import strategies as st
 from zyntalic import core
 
 
+def setup_module():
+    """Populate lazy caches outside Hypothesis's per-example timing window."""
+    core.generate_entry("__hypothesis_cache_warmup__", mirror_rate=0.2)
+
+
 @settings(max_examples=50)
 @given(st.text(min_size=1, max_size=30))
 def test_generate_entry_deterministic(seed):

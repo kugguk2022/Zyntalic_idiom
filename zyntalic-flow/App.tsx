@@ -2,6 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { TranslationEngine, TranslationConfig, TranslationResult } from './types';
 import { performTranslation } from './services/apiService';
+import { apiKeyHeaders } from './services/apiKey';
 import SettingsBar from './components/SettingsBar';
 import SigilColumn from './components/SigilColumn';
 import AnchorBars from './components/AnchorBars';
@@ -90,11 +91,17 @@ const App: React.FC = () => {
         
         fetch('/upload', {
           method: 'POST',
+          headers: apiKeyHeaders(),
           body: formData,
         })
           .then(response => {
             if (!response.ok) {
               return response.json().then(err => {
+                if (response.status === 401 || response.status === 403) {
+                  throw new Error(
+                    `${err.detail || 'Unauthorized.'} Set your API key in Settings.`
+                  );
+                }
                 throw new Error(err.detail || 'Failed to process PDF');
               });
             }
