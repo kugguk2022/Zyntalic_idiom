@@ -176,7 +176,8 @@ def _variant_controls(label: str, engine: str, mirror: float, register: str):
     ]
 
 
-with gr.Blocks(title="Zyntalic A/B", theme=gr.themes.Soft()) as demo:
+# Gradio 6 moved `theme` from the Blocks constructor to launch().
+with gr.Blocks(title="Zyntalic A/B") as demo:
     gr.Markdown(
         f"""
         # Zyntalic — A/B comparison
@@ -209,9 +210,9 @@ with gr.Blocks(title="Zyntalic A/B", theme=gr.themes.Soft()) as demo:
 
     with gr.Row():
         with gr.Column():
-            a_out = gr.Textbox(label="Variant A output", lines=5, show_copy_button=True)
+            a_out = gr.Textbox(label="Variant A output", lines=5)
         with gr.Column():
-            b_out = gr.Textbox(label="Variant B output", lines=5, show_copy_button=True)
+            b_out = gr.Textbox(label="Variant B output", lines=5)
 
     verdict_out = gr.Markdown()
     _spacer = gr.Markdown(visible=False)
@@ -234,4 +235,4 @@ with gr.Blocks(title="Zyntalic A/B", theme=gr.themes.Soft()) as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(theme=gr.themes.Soft())
