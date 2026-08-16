@@ -177,15 +177,9 @@ ANCHORS = [
 ]
 
 # -------------------- Lexicon Prior --------------------
-<<<<<<< HEAD
 _LEXICON_CACHE: dict[str, dict] | None = None
 _VOCAB_MAPPINGS_CACHE: dict[str, dict[str, str]] | None = None
 _STRICT_VOCAB_POOL_CACHE: dict[str, list[str]] = {}
-=======
-_LEXICON_CACHE: Optional[Dict[str, dict]] = None
-_VOCAB_MAPPINGS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
-_STRICT_VOCAB_POOL_CACHE: Dict[str, List[str]] = {}
->>>>>>> 4d9dd81dda027f173f41d59ca8f0a10889dd0e0c
 _PROJECTION_CACHE_SENTINEL = object()
 _PROJECTION_CACHE = _PROJECTION_CACHE_SENTINEL
 _VOCAB_EMB_CACHE: dict[str, list[list[float]]] = {}
@@ -739,11 +733,7 @@ def _stable_pick(values: Iterable[str], seed: str) -> str | None:
     return vals[int(rng.random() * len(vals))]
 
 
-<<<<<<< HEAD
 def _strict_vocab_pool(field: str, vocab_mappings) -> list[str]:
-=======
-def _strict_vocab_pool(field: str, vocab_mappings) -> List[str]:
->>>>>>> 4d9dd81dda027f173f41d59ca8f0a10889dd0e0c
     """Return tracked vocabulary values that satisfy the visible-surface contract."""
     if field in _STRICT_VOCAB_POOL_CACHE:
         return _STRICT_VOCAB_POOL_CACHE[field]
@@ -754,11 +744,7 @@ def _strict_vocab_pool(field: str, vocab_mappings) -> List[str]:
     return _STRICT_VOCAB_POOL_CACHE[field]
 
 
-<<<<<<< HEAD
 def _surface_script_counts(text: str) -> dict[str, int]:
-=======
-def _surface_script_counts(text: str) -> Dict[str, int]:
->>>>>>> 4d9dd81dda027f173f41d59ca8f0a10889dd0e0c
     counts = {"hangul": 0, "latin": 0}
     for ch in text or "":
         if "\uac00" <= ch <= "\ud7af":
