@@ -135,6 +135,41 @@ def test_expensive_routes_fail_closed_and_require_valid_api_key(monkeypatch):
     assert unconfigured.status_code == 503
 
 
+def test_loopback_requests_do_not_require_an_api_key():
+    request = web_app.Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/upload",
+            "headers": [],
+            "client": ("127.0.0.1", 53289),
+            "server": ("127.0.0.1", 8000),
+            "scheme": "http",
+            "query_string": b"",
+        }
+    )
+    web_app.require_api_access(request, supplied_key=None)
+
+
+def test_forwarded_loopback_header_does_not_bypass_api_key(monkeypatch):
+    monkeypatch.setattr(web_app, "API_KEY", "test-api-key")
+    request = web_app.Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/upload",
+            "headers": [(b"x-forwarded-for", b"127.0.0.1")],
+            "client": ("203.0.113.10", 53289),
+            "server": ("127.0.0.1", 8000),
+            "scheme": "http",
+            "query_string": b"",
+        }
+    )
+    with pytest.raises(web_app.HTTPException) as denied:
+        web_app.require_api_access(request, supplied_key=None)
+    assert denied.value.status_code == 401
+
+
 def test_rate_limit_returns_retry_after(monkeypatch):
     monkeypatch.setattr(web_app, "rate_limiter", SlidingWindowRateLimiter(1))
     with TestClient(app) as client:

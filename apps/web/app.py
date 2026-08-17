@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import io
 import os
 import re
@@ -98,12 +99,22 @@ api_key_header = APIKeyHeader(
 rate_limiter = SlidingWindowRateLimiter(RATE_LIMIT_PER_MINUTE)
 
 
+def _is_loopback_request(request: Request) -> bool:
+    """Return true only for clients whose resolved address is loopback."""
+    host = request.client.host if request.client else ""
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        # Do not trust hostnames or forwarding headers at this boundary.
+        return False
+
+
 def require_api_access(
     request: Request,
     supplied_key: Annotated[str | None, Depends(api_key_header)] = None,
 ) -> None:
-    """Fail closed unless a valid key or explicit loopback-only mode is active."""
-    if ALLOW_UNAUTHENTICATED_LOCAL:
+    """Allow real loopback clients; require a valid key everywhere else."""
+    if _is_loopback_request(request):
         identity = f"local:{request.client.host if request.client else 'unknown'}"
     else:
         if not API_KEY:
