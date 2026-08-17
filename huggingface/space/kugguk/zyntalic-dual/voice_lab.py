@@ -7,13 +7,35 @@ zero-shot clone conditioned on the speaker's own reference clip.
 
 from __future__ import annotations
 
+import re
+import tempfile
 from functools import lru_cache
 from pathlib import Path
-import re
 
 from zyntalic.translator import translate_text
 
 _CONTEXT_TAIL = re.compile(r"\s*⟦ctx:.*?⟧\s*$")
+_AUDIO_SUFFIXES = {".flac", ".m4a", ".mp3", ".ogg", ".wav", ".webm"}
+
+
+def _validated_audio_path(audio_path: str) -> Path:
+    if not audio_path:
+        raise ValueError("Record or upload a reference voice clip first.")
+    safe_name = Path(audio_path).name
+    if not safe_name or safe_name in {".", ".."}:
+        raise ValueError("Record or upload a reference voice clip first.")
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    matches = sorted(
+        (path for path in temp_root.rglob(safe_name) if path.is_file()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if not matches:
+        raise ValueError("Record or upload a reference voice clip first.")
+    resolved = matches[0].resolve()
+    if resolved.suffix.lower() not in _AUDIO_SUFFIXES:
+        raise ValueError("Upload a supported audio file format.")
+    return resolved
 
 
 @lru_cache(maxsize=1)
@@ -33,9 +55,8 @@ def _voice_model():
 
 
 def transcribe_reference(audio_path: str) -> str:
-    if not audio_path or not Path(audio_path).is_file():
-        raise ValueError("Record or upload a reference voice clip first.")
-    segments, _info = _transcriber().transcribe(audio_path, beam_size=5, vad_filter=True)
+    path = _validated_audio_path(audio_path)
+    segments, _info = _transcriber().transcribe(str(path), beam_size=5, vad_filter=True)
     transcript = " ".join(segment.text.strip() for segment in segments).strip()
     if not transcript:
         raise ValueError("No speech was detected in the reference clip.")
@@ -70,9 +91,10 @@ def deterministic_surface(text: str) -> str:
 def render_self_voice(audio_path: str, consent: bool):
     if not consent:
         raise ValueError("Confirm that the reference is your voice or licensed for this production.")
-    transcript = transcribe_reference(audio_path)
+    path = _validated_audio_path(audio_path)
+    transcript = transcribe_reference(str(path))
     surface = deterministic_surface(transcript)
     model = _voice_model()
-    waveform = model.generate(surface, audio_prompt_path=audio_path)
+    waveform = model.generate(surface, audio_prompt_path=str(path))
     samples = waveform.detach().cpu().float().squeeze().numpy()
     return transcript, surface, (model.sr, samples)

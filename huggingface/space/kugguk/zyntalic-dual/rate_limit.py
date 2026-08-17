@@ -9,11 +9,11 @@ import threading
 from datetime import datetime, timezone
 
 
-class AccessDenied(RuntimeError):
+class AccessDeniedError(RuntimeError):
     pass
 
 
-class SpendLimitReached(RuntimeError):
+class SpendLimitReachedError(RuntimeError):
     pass
 
 
@@ -52,7 +52,7 @@ class SpendGate:
 
     def consume(self, session_id: str) -> dict[str, int]:
         if not session_id:
-            raise AccessDenied("A browser session is required.")
+            raise AccessDeniedError("A browser session is required.")
         day = datetime.now(timezone.utc).date().isoformat()
         session = self._session_key(session_id)
         with self._lock, self._connect() as connection:
@@ -66,10 +66,10 @@ class SpendGate:
             session_count = row[0] if row else 0
             if total >= self.daily_cap:
                 connection.execute("ROLLBACK")
-                raise SpendLimitReached("The UTC daily experiment cap has been reached.")
+                raise SpendLimitReachedError("The UTC daily experiment cap has been reached.")
             if session_count >= self.session_cap:
                 connection.execute("ROLLBACK")
-                raise SpendLimitReached("This session has reached its experiment cap.")
+                raise SpendLimitReachedError("This session has reached its experiment cap.")
             connection.execute(
                 "INSERT INTO runs(day, session, count) VALUES(?, ?, 1) ON CONFLICT(day, session) DO UPDATE SET count = count + 1",
                 (day, session),

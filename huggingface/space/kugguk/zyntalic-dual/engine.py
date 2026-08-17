@@ -9,8 +9,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, TypeVar
 
-from pydantic import BaseModel
-
 from models import Adjudication, CrossDecodeReport, IntentState, LineageProposal, RunResult
 from prompts import (
     ASCI2_DECODER_PROMPT,
@@ -21,6 +19,7 @@ from prompts import (
     JUDGE_PROMPT,
     PROMPT_VERSION,
 )
+from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 ENGINE_VERSION = "2.0.0-machine-duel"
@@ -32,7 +31,7 @@ class ConfigurationError(RuntimeError):
     pass
 
 
-class ModelRefusal(RuntimeError):
+class ModelRefusalError(RuntimeError):
     pass
 
 
@@ -145,7 +144,7 @@ class OpenAITransport:
         parsed = response.output_parsed
         if parsed is None:
             refusal = getattr(response, "refusal", None)
-            raise ModelRefusal(str(refusal or f"{stage} returned no structured result."))
+            raise ModelRefusalError(str(refusal or f"{stage} returned no structured result."))
         trace = {
             "stage": stage,
             "model": getattr(response, "model", selected_model),

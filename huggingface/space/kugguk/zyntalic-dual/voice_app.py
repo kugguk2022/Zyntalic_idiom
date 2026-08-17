@@ -1,9 +1,7 @@
 """Repository-only v0.1 voice lab. This file is not used by the HF Space."""
 
 import gradio as gr
-
 from voice_lab import render_self_voice
-
 
 with gr.Blocks(title="Zyntalic v0.1 Voice Lab") as voice_demo:
     gr.Markdown(
