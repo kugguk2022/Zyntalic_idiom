@@ -212,6 +212,22 @@ def _error(exc: Exception):
     return {}, panel, panel, "", panel, {}
 
 
+def _ring_loader() -> str:
+    return """<section class="zy-ring-stage" aria-live="polite" aria-label="Machine duel compiling">
+      <div class="zy-ring-grid"></div>
+      <div class="zy-orbit outer"><span>ASCI</span></div>
+      <div class="zy-orbit inner"><span>ASCI2</span></div>
+      <div class="zy-ring-core"><b>COMPILING</b><small>intent → duel → cross-read → judge</small></div>
+      <div class="zy-ring-status"><i></i> Two independent lineages are entering the ring</div>
+    </section>"""
+
+
+def _loading_state():
+    ring = _ring_loader()
+    waiting = '<div class="zy-empty zy-pulse">Waiting for the ring verdict…</div>'
+    return {}, ring, ring, waiting, ring, {}
+
+
 def execute(
     source: str,
     context: str,
@@ -220,6 +236,9 @@ def execute(
     noise: int,
     request: gr.Request,
 ):
+    # A generator lets Gradio paint the arena before the slower hosted-model
+    # stages begin. Without this first yield, the v1.1 tab appears frozen.
+    yield _loading_state()
     try:
         session_id = getattr(request, "session_hash", "") or ""
         remaining = _spend_gate().consume(session_id)
@@ -231,7 +250,7 @@ def execute(
             + _decoder_lane(result.asci2_decoder)
             + "</div>"
         )
-        return (
+        yield (
             result.intent.model_dump(mode="json"),
             _candidate_card(result, "ASCI"),
             _candidate_card(result, "ASCI2"),
@@ -248,14 +267,14 @@ def execute(
         ValueError,
         RuntimeError,
     ) as exc:
-        return _error(exc)
+        yield _error(exc)
 
 
 with gr.Blocks(title="Zyntalic Dual — Machine A/B", css=CSS) as demo:
     gr.HTML(HERO)
     with gr.Tabs():
         with gr.Tab("v1.1 · ASCI ↔ ASCI2"):
-            gr.Markdown("**Experimental deep machine duel.** Public and rate-limited; expect a longer run.")
+            gr.Markdown("**Experimental deep machine duel.** Public and rate-limited; the arena stays live while the round compiles.")
             source_in = gr.Textbox(
                 label="Utterance",
                 lines=2,

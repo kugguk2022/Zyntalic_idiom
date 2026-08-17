@@ -27,7 +27,9 @@ def cinematic_surface(text: str, *, lineage: str = "neutral") -> str:
             continue
         glyph = html.escape(_glyph(character, visible_index, lineage))
         escaped = html.escape(character)
-        delay = min(visible_index, 96) * 13
+        # Let viewers read the mutation as a sequence instead of a flash. The
+        # cap keeps long passages from delaying their final characters forever.
+        delay = min(visible_index, 120) * 28
         spans.append(
             f'<span class="zy-morph-char" data-morph="{glyph}" '
             f'style="--zy-delay:{delay}ms">{escaped}</span>'

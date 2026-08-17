@@ -14,7 +14,7 @@ tags:
   - artificial-language
   - multi-agent
   - adversarial-evaluation
-  - openai
+  - creative-coding
 ---
 
 # Zyntalic Dual — machine-only A/B prototype

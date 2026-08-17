@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from engine import ConfigurationError, OpenAITransport, build_receipt, run_generation
 from cinematic import cinematic_pair, cinematic_surface
+from app import _loading_state, _ring_loader
 from models import (
     Adjudication,
     AdversarialProbe,
@@ -176,6 +177,15 @@ class EngineTests(unittest.TestCase):
         self.assertNotEqual(a, b)
         self.assertIn("zy-a", a)
         self.assertIn("zy-b", b)
+
+    def test_v11_loading_state_exposes_the_ring_before_models_finish(self):
+        ring = _ring_loader()
+        self.assertIn("zy-ring-stage", ring)
+        self.assertIn("ASCI2", ring)
+        state = _loading_state()
+        self.assertEqual(len(state), 6)
+        self.assertEqual(state[1], ring)
+        self.assertEqual(state[4], ring)
 
     def test_no_api_key_has_no_compiler_fallback(self):
         with patch.dict(os.environ, {}, clear=True):
