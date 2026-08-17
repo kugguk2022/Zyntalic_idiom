@@ -6,9 +6,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from engine import ConfigurationError, OpenAITransport, build_receipt, run_generation
-from cinematic import cinematic_pair, cinematic_surface
 from app import _loading_state, _ring_loader
+from cinematic import cinematic_pair, cinematic_surface
+from engine import ConfigurationError, OpenAITransport, build_receipt, run_generation
 from models import (
     Adjudication,
     AdversarialProbe,
@@ -22,7 +22,7 @@ from models import (
     TokenMove,
 )
 from prompts import ASCI2_DECODER_PROMPT, ASCI2_PROMPT, ASCI_DECODER_PROMPT, ASCI_PROMPT
-from rate_limit import AccessDenied, SpendGate, SpendLimitReached
+from rate_limit import AccessDeniedError, SpendGate, SpendLimitReachedError
 
 
 def candidate(lineage: str, index: int) -> StrategicCandidate:
@@ -247,16 +247,16 @@ class SpendGateTests(unittest.TestCase):
             with patch.dict(os.environ, env, clear=True):
                 gate = SpendGate(db_path)
                 self.assertEqual(gate.consume("session-a")["session_remaining"], 0)
-                with self.assertRaises(SpendLimitReached):
+                with self.assertRaises(SpendLimitReachedError):
                     gate.consume("session-a")
                 self.assertEqual(gate.consume("session-b")["daily_remaining"], 0)
-                with self.assertRaises(SpendLimitReached):
+                with self.assertRaises(SpendLimitReachedError):
                     gate.consume("session-c")
 
     def test_missing_browser_session_is_rejected(self):
         with patch.dict(os.environ, {}, clear=True), tempfile.TemporaryDirectory() as tmp:
             gate = SpendGate(str(Path(tmp) / "limits.sqlite3"))
-            with self.assertRaisesRegex(AccessDenied, "browser session"):
+            with self.assertRaisesRegex(AccessDeniedError, "browser session"):
                 gate.consume("")
 
 

@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
-import html
 import difflib
+import html
 import json
 import threading
 import time
 from typing import Any
 
 import gradio as gr
+from cinematic import cinematic_pair, cinematic_surface
+from engine import ConfigurationError, ModelProviderError, ModelRefusalError, run_generation
+from models import CrossDecodeReport, RunResult
+from rate_limit import AccessDeniedError, SpendGate, SpendLimitReachedError
+from theme import CSS, HERO
+
 from zyntalic import __version__ as deterministic_engine_version
 from zyntalic.core import ANCHORS
 from zyntalic.translator import translate_text, warm_translation_pipeline
-
-from cinematic import cinematic_pair, cinematic_surface
-from engine import ConfigurationError, ModelProviderError, ModelRefusal, run_generation
-from models import CrossDecodeReport, RunResult
-from rate_limit import AccessDenied, SpendGate, SpendLimitReached
-from theme import CSS, HERO
 
 PRESSURES = [
     "Hostile paraphrase",
@@ -259,11 +259,11 @@ def execute(
             result.receipt,
         )
     except (
-        AccessDenied,
-        SpendLimitReached,
+        AccessDeniedError,
+        SpendLimitReachedError,
         ConfigurationError,
         ModelProviderError,
-        ModelRefusal,
+        ModelRefusalError,
         ValueError,
         RuntimeError,
     ) as exc:

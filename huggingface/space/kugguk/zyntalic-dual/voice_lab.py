@@ -7,9 +7,9 @@ zero-shot clone conditioned on the speaker's own reference clip.
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
-import re
 
 from zyntalic.translator import translate_text
 
