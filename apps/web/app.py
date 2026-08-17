@@ -114,7 +114,7 @@ def require_api_access(
     supplied_key: Annotated[str | None, Depends(api_key_header)] = None,
 ) -> None:
     """Allow real loopback clients; require a valid key everywhere else."""
-    if _is_loopback_request(request):
+    if _is_loopback_request(request) or ALLOW_UNAUTHENTICATED_LOCAL:
         identity = f"local:{request.client.host if request.client else 'unknown'}"
     else:
         if not API_KEY:
