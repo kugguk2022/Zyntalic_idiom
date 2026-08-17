@@ -1,0 +1,5 @@
+# Local voice lab only. Use Python 3.11; do not add this file to the HF Space runtime.
+-r requirements.txt
+faster-whisper>=1.1,<2
+chatterbox-tts
+torchaudio
