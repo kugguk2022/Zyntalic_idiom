@@ -14,6 +14,7 @@ from zyntalic import __version__ as deterministic_engine_version
 from zyntalic.core import ANCHORS
 from zyntalic.translator import translate_text, warm_translation_pipeline
 
+from cinematic import cinematic_pair, cinematic_surface
 from engine import ConfigurationError, ModelProviderError, ModelRefusal, run_generation
 from models import CrossDecodeReport, RunResult
 from rate_limit import AccessDenied, SpendGate, SpendLimitReached
@@ -93,9 +94,9 @@ def compare_deterministic(
     a_evidentiality: str, a_anchor_mode: str, a_anchors: list[str],
     b_engine: str, b_mirror: float, b_register: str, b_dialect: str,
     b_evidentiality: str, b_anchor_mode: str, b_anchors: list[str],
-) -> tuple[str, str, str, str, str]:
+) -> tuple[str, str, str, str, str, str, str]:
     if not (text or "").strip():
-        return "", "", "Enter source text to compare.", "{}", "{}"
+        return "", "", "", "", "Enter source text to compare.", "{}", "{}"
     a = _run_deterministic_variant(
         text, a_engine, a_mirror, a_register, a_dialect,
         a_evidentiality, a_anchor_mode, a_anchors,
@@ -113,8 +114,9 @@ def compare_deterministic(
         f"\n\nA: {a['elapsed_ms']:.1f} ms · B: {b['elapsed_ms']:.1f} ms"
         f"\n\nDeterminism check: **{'passed' if a_repeat['surface'] == a['surface'] else 'failed'}**"
     )
+    a_surface, b_surface = cinematic_pair(a["surface"], b["surface"])
     return (
-        a["surface"], b["surface"], verdict,
+        a_surface, b_surface, a["surface"], b["surface"], verdict,
         json.dumps(a["sidecar"], ensure_ascii=False, indent=2),
         json.dumps(b["sidecar"], ensure_ascii=False, indent=2),
     )
@@ -144,7 +146,7 @@ def _candidate_card(result: RunResult, lineage: str) -> str:
         blocks.append(
             f"""<div class="zy-candidate">
               <div class="zy-id">{_e(candidate.candidate_id)}</div>
-              <div class="zy-surface">{_e(candidate.surface)}</div>
+              <div class="zy-surface">{cinematic_surface(candidate.surface, lineage=card_class)}</div>
               <div class="zy-tail">context · {_e(candidate.context_tail)}</div>
               <div class="zy-strategy"><b>move:</b> {_e(candidate.strategy)}</div>
               <div class="zy-detail"><b>expected reading</b><span>{_e(candidate.expected_reading)}</span></div>
@@ -310,8 +312,22 @@ with gr.Blocks(title="Zyntalic Dual — Machine A/B", css=CSS) as demo:
                     deterministic_b_inputs = _deterministic_controls("B", "chiasmus", .8, "literary")
             deterministic_verdict = gr.Markdown("Run a comparison to see the reproducibility result.")
             with gr.Row():
-                deterministic_a_out = gr.Textbox(label="Variant A output", lines=5, show_copy_button=True)
-                deterministic_b_out = gr.Textbox(label="Variant B output", lines=5, show_copy_button=True)
+                deterministic_a_out = gr.HTML(
+                    '<div class="zy-output-shell a"><div class="zy-id">VARIANT A · CINEMATIC SURFACE</div>'
+                    '<div class="zy-empty">Run the deterministic duel to reveal channel A.</div></div>'
+                )
+                deterministic_b_out = gr.HTML(
+                    '<div class="zy-output-shell b"><div class="zy-id">VARIANT B · CINEMATIC SURFACE</div>'
+                    '<div class="zy-empty">Run the deterministic duel to reveal channel B.</div></div>'
+                )
+            with gr.Accordion("Copy exact deterministic surfaces", open=False):
+                with gr.Row():
+                    deterministic_a_raw = gr.Textbox(
+                        label="Variant A exact output", lines=4, show_copy_button=True,
+                    )
+                    deterministic_b_raw = gr.Textbox(
+                        label="Variant B exact output", lines=4, show_copy_button=True,
+                    )
             with gr.Accordion("Deterministic sidecars", open=False):
                 with gr.Row():
                     deterministic_a_side = gr.Code(language="json", label="A sidecar")
@@ -321,7 +337,8 @@ with gr.Blocks(title="Zyntalic Dual — Machine A/B", css=CSS) as demo:
                 deterministic_text, *deterministic_a_inputs, *deterministic_b_inputs,
             ]
             deterministic_outputs = [
-                deterministic_a_out, deterministic_b_out, deterministic_verdict,
+                deterministic_a_out, deterministic_b_out,
+                deterministic_a_raw, deterministic_b_raw, deterministic_verdict,
                 deterministic_a_side, deterministic_b_side,
             ]
             deterministic_run.click(

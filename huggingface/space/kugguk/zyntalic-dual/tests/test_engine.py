@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from engine import ConfigurationError, OpenAITransport, build_receipt, run_generation
+from cinematic import cinematic_pair, cinematic_surface
 from models import (
     Adjudication,
     AdversarialProbe,
@@ -161,6 +162,21 @@ class FakeTransport:
 
 
 class EngineTests(unittest.TestCase):
+    def test_cinematic_surface_is_escaped_stable_and_accessible(self):
+        source = '<script>alert("x")</script> żółć 한'
+        first = cinematic_surface(source, lineage="a")
+        self.assertEqual(first, cinematic_surface(source, lineage="a"))
+        self.assertNotIn("<script>", first)
+        self.assertIn("&lt;", first)
+        self.assertIn('aria-label="&lt;script&gt;alert(&quot;x&quot;)', first)
+        self.assertIn('class="zy-morph-char"', first)
+
+    def test_cinematic_pair_keeps_distinct_lineage_paths(self):
+        a, b = cinematic_pair("same", "same")
+        self.assertNotEqual(a, b)
+        self.assertIn("zy-a", a)
+        self.assertIn("zy-b", b)
+
     def test_no_api_key_has_no_compiler_fallback(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(ConfigurationError, "no compiler fallback"):
