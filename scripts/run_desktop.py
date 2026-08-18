@@ -22,6 +22,7 @@ except ImportError:
     uvicorn = None
 
 from apps.web.app import app  # noqa: E402 - local-only mode must be set before app import
+from zyntalic.netconfig import resolve_host, resolve_port  # noqa: E402
 
 REQ_PY_LIBS = {
     "pypdf": "pypdf is required for PDF uploads. Install with: python -m pip install -e '.[pdf]'",
@@ -66,8 +67,8 @@ def ensure_port_available(host: str, port: int) -> None:
             sys.exit(1)
 
 
-PORT = 8001
-HOST = "127.0.0.1"
+PORT = resolve_port()
+HOST = resolve_host()
 
 
 def start_server():

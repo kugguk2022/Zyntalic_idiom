@@ -13,6 +13,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Dict, Iterable
 
+from zyntalic.netconfig import base_url
+
 try:
     import requests
 except Exception:
@@ -54,7 +56,7 @@ def main() -> int:
     p.add_argument("--output", default="data_generation/dictionary/zyntalic_dictionary.json")
     p.add_argument("--output-tsv", default="data_generation/dictionary/zyntalic_dictionary.tsv")
     p.add_argument("--mode", choices=["api", "server"], default="api")
-    p.add_argument("--server-url", default="http://127.0.0.1:8001/translate")
+    p.add_argument("--server-url", default=f"{base_url()}/translate")
     p.add_argument("--engine", default="core")
     p.add_argument("--mirror-rate", type=float, default=0.3)
     p.add_argument("--min-count", type=int, default=1)

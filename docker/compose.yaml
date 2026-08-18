@@ -1,7 +1,7 @@
 # Production-shaped stack for alienway.fun.
 #
 # The service binds to loopback only: terminate TLS and enforce the public rate
-# limit in a reverse proxy on the host, then forward to 127.0.0.1:8000.
+# limit in a reverse proxy on the host, then forward to 127.0.0.1:8004.
 #
 #   ZYNTALIC_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" \
 #     docker compose -f docker/compose.yaml up -d --build
@@ -14,7 +14,8 @@ services:
     image: zyntalic:local
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8000:8000"
+      # Host port matches zyntalic/netconfig.py DEFAULT_PORT; container port stays 8000.
+      - "127.0.0.1:8004:8000"
     environment:
       # Required. The app fails closed with 503 if this is unset.
       ZYNTALIC_API_KEY: ${ZYNTALIC_API_KEY:?set ZYNTALIC_API_KEY before starting}

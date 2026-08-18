@@ -97,11 +97,11 @@ Install and start the authenticated API:
 ```bash
 python -m pip install -e ".[web,pdf]"
 export ZYNTALIC_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-uvicorn apps.web.app:app --host 127.0.0.1 --port 8000
+uvicorn apps.web.app:app --host 127.0.0.1 --port 8004
 ```
 
 ```bash
-curl --fail-with-body http://127.0.0.1:8000/v1/translate \
+curl --fail-with-body http://127.0.0.1:8004/v1/translate \
   -H 'Content-Type: application/json' \
   -H "X-API-Key: $ZYNTALIC_API_KEY" \
   -d '{"text":"I see the river at night.","engine":"core","mirror_rate":0.3}'
@@ -127,7 +127,7 @@ export ZYNTALIC_CORS_ORIGINS="https://your-domain"
 docker compose -f docker/compose.yaml up -d --build
 ```
 
-The service binds to `127.0.0.1:8000`. Terminate TLS and enforce the public rate
+The service binds to `127.0.0.1:8004`. Terminate TLS and enforce the public rate
 limit in a reverse proxy in front of it, because the built-in limiter keeps
 counters in process memory and the image runs a single worker on purpose. The
 translation cache is SQLite on a named volume, so redeploys keep warm results;

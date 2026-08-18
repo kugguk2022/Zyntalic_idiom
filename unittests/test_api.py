@@ -1,7 +1,9 @@
 import requests
 import json
 
-url = "http://127.0.0.1:8001/translate"
+from zyntalic.netconfig import base_url
+
+url = f"{base_url()}/translate"
 payload = {
     "text": "Hello world",
     "mirror_rate": 0.3,

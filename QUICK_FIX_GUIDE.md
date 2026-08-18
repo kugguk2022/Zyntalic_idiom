@@ -23,7 +23,7 @@
 - This is expected PowerShell behavior - running commands interrupts background process
 
 ### Linux/WSL (Your screenshot error)
-- **Port 8001 already in use** - Another process is using the port
+- **Port 8004 already in use** - Another process is using the port
 - pywebview dependencies missing (non-critical, uses browser instead)
 
 ## 🔧 Quick Fixes
@@ -31,8 +31,8 @@
 ### For Linux/WSL:
 
 ```bash
-# 1. Kill process on port 8001
-lsof -ti :8001 | xargs kill -9
+# 1. Stop the Zyntalic server (verifies identity before killing)
+python -m scripts.admin_cli restart
 
 # 2. Start server
 python3 -m scripts.run_desktop
@@ -80,15 +80,15 @@ pytest -q tests/test_output_format.py
 
 **"Failed to connect to Zyntalic Local Engine"**
 - Server not running → Run `python -m scripts.run_desktop`
-- Port conflict → Kill process on 8001 first
+- Port conflict → run 'python -m scripts.admin_cli status' to see what holds the port
 
 **"Address already in use"**
 ```bash
 # Linux
-lsof -ti :8001 | xargs kill -9
+python -m scripts.admin_cli restart
 
 # Windows
-netstat -ano | findstr :8001
+netstat -ano | findstr :8004
 taskkill /F /PID <PID>
 ```
 

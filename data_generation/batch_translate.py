@@ -16,6 +16,8 @@ import time
 from pathlib import Path
 from typing import Dict, Iterable, List
 
+from zyntalic.netconfig import base_url
+
 try:
     import requests
 except Exception:
@@ -58,7 +60,7 @@ def main() -> int:
     p.add_argument("--input", default="data_generation/sentences/sentences.jsonl")
     p.add_argument("--output", default="data_generation/sentences/translations.jsonl")
     p.add_argument("--mode", choices=["api", "server"], default="api")
-    p.add_argument("--server-url", default="http://127.0.0.1:8001/translate")
+    p.add_argument("--server-url", default=f"{base_url()}/translate")
     p.add_argument("--engine", default="core")
     p.add_argument("--mirror-rate", type=float, default=0.3)
     p.add_argument("--limit", type=int, default=0)

@@ -66,7 +66,7 @@ Run the full pipeline with optional connectivity checks:
 Common environment overrides:
 
 ```bash
-MODE=server SERVER_URL=http://127.0.0.1:8001/translate ./run_data_pipeline.sh
+MODE=server SERVER_URL=http://127.0.0.1:8004/translate ./run_data_pipeline.sh
 SCRAPE_GUTENBERG=1 SCRAPE_ANNAS=1 ./run_data_pipeline.sh
 LIMIT=500 ./run_data_pipeline.sh
 ```
@@ -131,7 +131,7 @@ then use `--mode server`:
 ```bash
 python data_generation/batch_translate.py \
   --mode server \
-  --server-url http://127.0.0.1:8001/translate
+  --server-url http://127.0.0.1:8004/translate
 ```
 
 ## Projection Training

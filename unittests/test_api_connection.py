@@ -1,11 +1,13 @@
 import requests
 import json
 
+from zyntalic.netconfig import base_url
+
 print("=" * 70)
 print("Testing Zyntalic API Connection")
 print("=" * 70)
 
-url = "http://127.0.0.1:8001/translate"
+url = f"{base_url()}/translate"
 data = {
     "text": "The quick brown fox jumps over the lazy dog.",
     "mirror_rate": 0.3,
@@ -35,7 +37,7 @@ try:
     print("\n✅ Server is working correctly!")
     
 except requests.exceptions.ConnectionError:
-    print("❌ ERROR: Cannot connect to server at http://127.0.0.1:8001")
+    print(f"❌ ERROR: Cannot connect to server at {base_url()}")
     print("   Make sure the server is running: python -m run_desktop")
 except Exception as e:
     print(f"❌ ERROR: {e}")

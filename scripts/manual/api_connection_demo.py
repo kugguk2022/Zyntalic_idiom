@@ -5,7 +5,9 @@ import json
 from urllib import request, error
 
 
-URL = "http://127.0.0.1:8001/translate"
+from zyntalic.netconfig import base_url
+
+URL = f"{base_url()}/translate"
 DATA = {
     "text": "The quick brown fox jumps over the lazy dog.",
     "mirror_rate": 0.3,
@@ -35,5 +37,5 @@ def main():
         print(f"❌ ERROR: {exc}")
 
 
-+if __name__ == "__main__":
-+    main()
+if __name__ == "__main__":
+    main()

@@ -1,63 +1,20 @@
 #!/usr/bin/env python3
-"""Kill any process using port 8001 and restart the server."""
+"""Stop the Zyntalic server and start it again.
 
-import subprocess
+Delegates to :mod:`scripts.admin_cli`, which resolves the port from ``ZYNTALIC_PORT`` and confirms
+the process it is about to kill is actually Zyntalic. The previous standalone version did neither:
+it killed whatever held a hardcoded port, which on a machine running more than one local API meant
+terminating an unrelated project and reporting success.
+"""
+
 import sys
-import time
-import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-def kill_port_8001():
-    """Kill any process using port 8001."""
-    try:
-        if sys.platform == 'win32':
-            # Windows
-            result = subprocess.run(
-                ['netstat', '-ano'], 
-                capture_output=True, 
-                text=True
-            )
-            for line in result.stdout.split('\n'):
-                if ':8001' in line and 'LISTENING' in line:
-                    parts = line.split()
-                    pid = parts[-1]
-                    print(f"Found process {pid} on port 8001, killing...")
-                    subprocess.run(['taskkill', '/F', '/PID', pid], check=False)
-                    time.sleep(1)
-        else:
-            # Linux/Mac
-            result = subprocess.run(
-                ['lsof', '-ti', ':8001'],
-                capture_output=True,
-                text=True
-            )
-            pids = result.stdout.strip().split('\n')
-            for pid in pids:
-                if pid:
-                    print(f"Found process {pid} on port 8001, killing...")
-                    subprocess.run(['kill', '-9', pid], check=False)
-                    time.sleep(1)
-    except Exception as e:
-        print(f"Error killing processes: {e}")
-
-def start_server():
-    """Start the Zyntalic server."""
-    print("\nStarting Zyntalic server on port 8001...")
-    try:
-        # Start the server
-        os.execv(sys.executable, [sys.executable, '-m', 'scripts.run_desktop'])
-    except Exception as e:
-        print(f"Error starting server: {e}")
-        sys.exit(1)
+from scripts.admin_cli import main  # noqa: E402
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("Zyntalic Server Restart Tool")
-    print("=" * 60)
-    
-    kill_port_8001()
-    print("\nWaiting 2 seconds...")
-    time.sleep(2)
-    start_server()
+    raise SystemExit(main(["restart"] + sys.argv[1:]))

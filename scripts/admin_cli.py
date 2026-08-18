@@ -9,7 +9,10 @@ import socket
 import subprocess
 import sys
 import time
+import json
 from urllib import request
+
+from zyntalic.netconfig import DEFAULT_HOST, base_url, resolve_host, resolve_port
 
 
 def check_port(host: str, port: int) -> bool:
@@ -24,7 +27,12 @@ def check_server_running(port: int) -> bool:
             result = subprocess.run(
                 ["netstat", "-ano"], capture_output=True, text=True, check=False
             )
-            return f":{port}" in result.stdout and "LISTENING" in result.stdout
+            # Both conditions must hold on the SAME line. Testing them against the whole output
+            # matches an unrelated outbound connection and reports a server that is not there.
+            return any(
+                f":{port} " in line and "LISTENING" in line
+                for line in result.stdout.splitlines()
+            )
         result = subprocess.run(
             ["lsof", "-ti", f":{port}"], capture_output=True, text=True, check=False
         )
@@ -60,14 +68,54 @@ def test_api(url: str) -> bool:
         return False
 
 
-def kill_port(port: int) -> None:
+def service_identity(host: str, port: int) -> str | None:
+    """Name of whatever is answering on the port, from its OpenAPI title.
+
+    ``/health`` cannot be used to tell services apart -- neighbouring FastAPI projects expose one
+    too, and a bare ``{"ok": true}`` looks identical whoever sent it. The OpenAPI title is the
+    cheapest field that actually identifies the application.
+
+    Returns ``None`` when the port is silent or the responder is not a FastAPI app.
+    """
+    try:
+        with request.urlopen(f"http://{host}:{port}/openapi.json", timeout=3) as resp:
+            title = json.load(resp).get("info", {}).get("title")
+    except Exception:
+        return None
+    return title if isinstance(title, str) else None
+
+
+def kill_port(port: int, host: str = DEFAULT_HOST, force: bool = False) -> bool:
+    """Stop the Zyntalic server on ``port``. Refuses to kill anything else.
+
+    This used to terminate whichever PID held the port, no questions asked. Because the port
+    number itself was wrong in this file, that meant an unrelated project's API got killed by a
+    tool that then reported success -- and the actual Zyntalic process, listening elsewhere,
+    survived every "restart". Confirm the identity before firing.
+
+    Returns True if the port was cleared (or was already free).
+    """
+    identity = service_identity(host, port)
+    if identity is None and check_port(host, port) and not force:
+        print(
+            f"Refusing to kill: something holds {host}:{port} but does not answer /openapi.json, "
+            f"so it cannot be confirmed as Zyntalic. Inspect it, or re-run with --force."
+        )
+        return False
+    if identity is not None and "zyntalic" not in identity.lower() and not force:
+        print(
+            f"Refusing to kill: {host}:{port} is serving {identity!r}, not Zyntalic. "
+            f"Point ZYNTALIC_PORT at the right port, or re-run with --force."
+        )
+        return False
+
     try:
         if sys.platform == "win32":
             result = subprocess.run(
                 ["netstat", "-ano"], capture_output=True, text=True, check=False
             )
             for line in result.stdout.splitlines():
-                if f":{port}" in line and "LISTENING" in line:
+                if f":{port} " in line and "LISTENING" in line:
                     parts = line.split()
                     pid = parts[-1]
                     subprocess.run(["taskkill", "/F", "/PID", pid], check=False)
@@ -82,6 +130,8 @@ def kill_port(port: int) -> None:
                     time.sleep(1)
     except Exception as exc:
         print(f"Error killing processes: {exc}")
+        return False
+    return True
 
 
 def cmd_check_port(args: argparse.Namespace) -> int:
@@ -147,7 +197,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     if ok:
         print("✅ All systems operational!")
         print()
-        print(f"Access Zyntalic at: http://127.0.0.1:{args.port}")
+        print(f"Access Zyntalic at: {base_url()}")
     else:
         print("⚠️  Some issues detected. See fixes above.")
 
@@ -156,11 +206,14 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_restart(args: argparse.Namespace) -> int:
-    print(f"Restarting Zyntalic server on port {args.port} says...")
-    kill_port(args.port)
+    print(f"Restarting Zyntalic server on {args.host}:{args.port}...")
+    # Do not relaunch over a port we could not clear: uvicorn would fail to bind, and the process
+    # still holding it would keep answering requests meant for the new server.
+    if not kill_port(args.port, args.host, force=args.force):
+        return 1
     time.sleep(2)
     try:
-        os.execv(sys.executable, [sys.executable, "-m", "run_desktop"])
+        os.execv(sys.executable, [sys.executable, "-m", "scripts.run_desktop"])
     except Exception as exc:
         print(f"Error starting server: {exc}")
         return 1
@@ -171,23 +224,38 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     cp = sub.add_parser("check-port", help="Check if a port is open")
-    cp.add_argument("--host", default="127.0.0.1")
-    cp.add_argument("--port", type=int, default=8001)
+    cp.add_argument("--host", default=resolve_host())
+    cp.add_argument("--port", type=int, default=resolve_port())
     cp.set_defaults(func=cmd_check_port)
 
     st = sub.add_parser("status", help="Check server/frontend status")
-    st.add_argument("--port", type=int, default=8001)
-    st.add_argument("--health-url", default="http://127.0.0.1:8001/health")
+    st.add_argument("--port", type=int, default=resolve_port())
+    st.add_argument("--health-url", default=f"{base_url()}/health")
     st.set_defaults(func=cmd_status)
 
-    rs = sub.add_parser("restart", help="Kill port and restart server")
-    rs.add_argument("--port", type=int, default=8001)
+    rs = sub.add_parser("restart", help="Stop the Zyntalic server and start it again")
+    rs.add_argument("--host", default=resolve_host())
+    rs.add_argument("--port", type=int, default=resolve_port())
+    rs.add_argument(
+        "--force",
+        action="store_true",
+        help="Kill the port holder even if it cannot be confirmed as Zyntalic",
+    )
     rs.set_defaults(func=cmd_restart)
 
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
+    # The status output uses ✅/❌, which the Windows console's default cp1252 codepage cannot
+    # encode -- the diagnostic tool crashed with UnicodeEncodeError partway through reporting,
+    # on exactly the platform most likely to need it.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):  # pragma: no cover - non-reconfigurable stream
+            pass
+
     parser = build_parser()
     args = parser.parse_args(argv)
     return args.func(args)

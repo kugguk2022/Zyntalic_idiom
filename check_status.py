@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility wrapper for scripts/admin_cli.py status."""
+"""Backward-compatibility wrapper. Prefer: python -m scripts.admin_cli status"""
 
 from scripts.admin_cli import main
 

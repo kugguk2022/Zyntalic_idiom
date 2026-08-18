@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PORT=8001
-HOST=127.0.0.1
 PYTHON=${PYTHON:-python}
 
 # Always run from the repo root (one level above this script)
@@ -19,14 +17,19 @@ if ! command -v "$PYTHON" >/dev/null 2>&1; then
     exit 1
 fi
 
+# Single-sourced from zyntalic/netconfig.py so this script cannot drift away from the launcher.
+# Override with ZYNTALIC_PORT in the environment; do not hardcode a number here again.
+PORT="${ZYNTALIC_PORT:-$("$PYTHON" -c 'from zyntalic.netconfig import DEFAULT_PORT; print(DEFAULT_PORT)')}"
+HOST="${ZYNTALIC_HOST:-127.0.0.1}"
+
 echo "Checking port ${PORT} availability..."
 "$PYTHON" - <<PY
 import socket, sys
-host, port = "127.0.0.1", ${PORT}
+host, port = "${HOST}", ${PORT}
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.5)
         if s.connect_ex((host, port)) == 0:
-                print(f"Port {port} on {host} is already in use. Stop the existing process or set PORT.")
+                print(f"Port {port} on {host} is already in use. Stop it, or set ZYNTALIC_PORT.")
                 sys.exit(1)
 print(f"Port {port} is free. Continuing...")
 PY

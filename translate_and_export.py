@@ -3,8 +3,10 @@ import requests
 import json
 import sys
 
+from zyntalic.netconfig import base_url
+
 def translate_and_save(text, filename="zyntalic_export.txt"):
-    url = "http://127.0.0.1:8001/translate"
+    url = f"{base_url()}/translate"
     payload = {
         "text": text,
         "mirror_rate": 0.3,

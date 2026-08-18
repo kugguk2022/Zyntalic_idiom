@@ -160,7 +160,7 @@ After running `generate_embeddings.py`:
 ### Web API
 
 ```bash
-curl -X POST http://localhost:8001/translate \
+curl -X POST http://localhost:8004/translate \
   -H "Content-Type: application/json" \
   -d '{
     "text": "Hello world",
@@ -188,7 +188,7 @@ Response:
 python -m run_desktop
 ```
 
-Then navigate to: http://localhost:8001
+Then navigate to: http://localhost:8004
 
 The UI provides:
 - Engine selection (Transformer, Neural, Deterministic, Test Suite)
