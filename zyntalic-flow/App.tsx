@@ -1,28 +1,94 @@
-
-import React, { useState, useRef } from 'react';
-import { TranslationEngine, TranslationConfig, TranslationResult } from './types';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { TranslationConfig, TranslationEngine, TranslationResult } from './types';
 import { performTranslation } from './services/apiService';
 import SettingsBar from './components/SettingsBar';
-import SigilColumn from './components/SigilColumn';
-import AnchorBars from './components/AnchorBars';
 
-const formatAnchorLabel = (anchor: string): string =>
-  anchor.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+const DEMOS = [
+  {
+    source: 'Time flows like water',
+    target: '과먦톕 췃ńęn챿 ła괽쮄 믔뚿숦',
+  },
+  {
+    source: 'Knowledge is power',
+    target: '렺zę쀞듼 듡힞ć 뤻펡쉽ć',
+  },
+  {
+    source: 'Beautiful birds sing',
+    target: '텋젵뫰퍆 깏꽂번 mopjiću',
+  },
+  {
+    source: 'Hope springs eternal',
+    target: '븩rązcuc 쐬뷽뮪꿼 ńo쇍곗쮯',
+  },
+];
+
+const GLYPHS = Array.from('⟡◊⌁∿∆∴·⟢⟣ʒŋłćńęą쥂챿숦듼렺힞쀞');
+
+const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+
+const hashIndex = (index: number, salt: number) => {
+  let x = (index + 1) * 2654435761 + salt * 2246822519;
+  x ^= x >>> 15;
+  x = Math.imul(x, 3266489917);
+  x ^= x >>> 16;
+  return Math.abs(x >>> 0);
+};
+
+const morphText = (source: string, target: string, progress: number, salt: number): string => {
+  const from = Array.from(source);
+  const to = Array.from(target);
+  const length = Math.max(from.length, to.length);
+  const p = clamp(progress);
+
+  return Array.from({ length }, (_, index) => {
+    const revealAt = 0.08 + ((hashIndex(index, salt) % 1000) / 1000) * 0.78;
+    const sourceChar = from[index] ?? ' ';
+    const targetChar = to[index] ?? '';
+
+    if (p >= revealAt) return targetChar;
+    if (p < revealAt - 0.16) return sourceChar;
+
+    const glyphIndex = (hashIndex(index + Math.floor(p * 41), salt + 7) + index) % GLYPHS.length;
+    return GLYPHS[glyphIndex];
+  }).join('');
+};
+
+const counterSurface = (target: string): string => {
+  const chars = Array.from(target);
+  return chars.map((char, index) => {
+    if (/\s/.test(char)) return char;
+    if (index % 5 !== 2) return char;
+    return GLYPHS[hashIndex(index, 19) % GLYPHS.length];
+  }).join('');
+};
+
+const agreementScore = (a: string, b: string): number => {
+  const left = Array.from(a);
+  const right = Array.from(b);
+  const length = Math.max(left.length, right.length);
+  if (length === 0) return 100;
+  let matches = 0;
+  for (let index = 0; index < length; index += 1) {
+    if ((left[index] ?? '') === (right[index] ?? '')) matches += 1;
+  }
+  return Math.round((matches / length) * 100);
+};
 
 const App: React.FC = () => {
   const [inputText, setInputText] = useState('');
-  const [outputResult, setOutputResult] = useState<TranslationResult | null>(null);
+  const [primaryResult, setPrimaryResult] = useState<TranslationResult | null>(null);
+  const [secondaryResult, setSecondaryResult] = useState<TranslationResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<'demo' | 'live'>('demo');
+  const [demoIndex, setDemoIndex] = useState(0);
+  const [phase, setPhase] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Central flag so every export/download button unlocks as soon as any result object exists
-  // (avoid over-strict trimming that could keep buttons disabled)
-  const hasOutput = !!outputResult && outputResult.text !== undefined;
 
   const [config, setConfig] = useState<TranslationConfig>({
     engine: TranslationEngine.SEMANTIC,
-    mirror: 0.3,  // Lower value shows more Zyntalic vocabulary
+    mirror: 0.3,
     sourceLang: 'Auto-detect',
     targetLang: 'Zyntalic',
     evidentiality: 'direct',
@@ -34,460 +100,462 @@ const App: React.FC = () => {
     frameB: '',
   });
 
-  const latencyMs = outputResult?.latency ?? null;
-  const latencyPct = latencyMs ? Math.min(100, (latencyMs / 5000) * 100) : 0;
-  const speedLabel = latencyMs == null ? '--' : latencyMs < 800 ? 'Fast' : latencyMs < 2000 ? 'Medium' : 'Slow';
-  const msPerChar = latencyMs && inputText.length > 0 ? (latencyMs / inputText.length) : null;
-  const showMirror = !!outputResult?.mirrorText && config.mirror > 0.75;
+  useEffect(() => {
+    if (isPaused) return undefined;
+
+    const interval = window.setInterval(() => {
+      setPhase((current) => {
+        if (mode === 'live') return Math.min(100, current + 2.4);
+        if (current >= 100) {
+          setDemoIndex((index) => (index + 1) % DEMOS.length);
+          return 0;
+        }
+        return current + 1.45;
+      });
+    }, 70);
+
+    return () => window.clearInterval(interval);
+  }, [isPaused, mode]);
+
+  const demo = DEMOS[demoIndex];
+  const source = mode === 'live' ? inputText : demo.source;
+  const primaryTarget = mode === 'live'
+    ? (primaryResult?.text || source)
+    : demo.target;
+  const secondaryTarget = mode === 'live'
+    ? (secondaryResult?.text || primaryTarget)
+    : counterSurface(demo.target);
+
+  const normalizedPhase = phase / 100;
+  const pathAProgress = clamp((normalizedPhase - 0.08) / 0.58);
+  const pathBProgress = clamp((normalizedPhase - 0.16) / 0.58);
+  const convergenceProgress = clamp((normalizedPhase - 0.62) / 0.32);
+
+  const traceA = useMemo(
+    () => morphText(source, primaryTarget, pathAProgress, 11),
+    [source, primaryTarget, pathAProgress],
+  );
+  const traceB = useMemo(
+    () => morphText(source, secondaryTarget, pathBProgress, 29),
+    [source, secondaryTarget, pathBProgress],
+  );
+  const finalSurface = useMemo(
+    () => morphText(source, primaryTarget, convergenceProgress, 47),
+    [source, primaryTarget, convergenceProgress],
+  );
+
+  const agreement = agreementScore(primaryTarget, secondaryTarget);
+  const readback = mode === 'live' ? primaryResult?.mirrorText : undefined;
+  const latency = mode === 'live'
+    ? Math.max(primaryResult?.latency || 0, secondaryResult?.latency || 0)
+    : null;
+  const traceLabelA = mode === 'live' ? config.engine : 'semantic path';
+  const traceLabelB = mode === 'live'
+    ? (config.engine === TranslationEngine.SEMANTIC ? TranslationEngine.NEURAL : TranslationEngine.SEMANTIC)
+    : 'counter path';
+
+  const challengerConfig = (): TranslationConfig => ({
+    ...config,
+    engine: config.engine === TranslationEngine.SEMANTIC
+      ? TranslationEngine.NEURAL
+      : TranslationEngine.SEMANTIC,
+    mirror: clamp(config.mirror + 0.12),
+  });
 
   const handleTranslate = async () => {
-    if (!inputText.trim()) return;
-    
+    const text = inputText.trim();
+    if (!text) return;
+
     setIsProcessing(true);
     setError(null);
+    setPrimaryResult(null);
+    setSecondaryResult(null);
+
     try {
-      const result = await performTranslation(inputText, config);
-      setOutputResult(result);
-      // Auto-export removed: It triggers browser popup blockers.
-      // User must click the manual "Download" button.
-    } catch (err: any) {
-      setError(err.message || 'Transmission error detected.');
+      const [primary, challenger] = await Promise.allSettled([
+        performTranslation(text, config),
+        performTranslation(text, challengerConfig()),
+      ]);
+
+      if (primary.status === 'rejected' && challenger.status === 'rejected') {
+        const reasonA = primary.reason instanceof Error ? primary.reason.message : String(primary.reason);
+        const reasonB = challenger.reason instanceof Error ? challenger.reason.message : String(challenger.reason);
+        throw new Error(`Both traces failed. A: ${reasonA} B: ${reasonB}`);
+      }
+
+      const resolvedPrimary = primary.status === 'fulfilled'
+        ? primary.value
+        : challenger.status === 'fulfilled'
+          ? challenger.value
+          : null;
+      const resolvedSecondary = challenger.status === 'fulfilled'
+        ? challenger.value
+        : resolvedPrimary;
+
+      setPrimaryResult(resolvedPrimary);
+      setSecondaryResult(resolvedSecondary);
+      setMode('live');
+      setPhase(0);
+      setIsPaused(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Dual trace failed.');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Check file type
-      const validTypes = ['.txt', '.md', '.pdf'];
-      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-      
-      if (!validTypes.includes(fileExt)) {
-        setError(`Invalid file type. Please upload TXT, MD, or PDF files.`);
-        return;
-      }
-      
-      // Handle text files directly
-      if (fileExt === '.txt' || fileExt === '.md') {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const text = ev.target?.result as string;
-          setInputText(text);
-        };
-        reader.onerror = () => {
-          setError('Failed to read file. Please try again.');
-        };
-        reader.readAsText(file);
-      } else if (fileExt === '.pdf') {
-        // Handle PDF via backend API
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        setIsProcessing(true);
-        setError(null);
-        
-        fetch('/upload', {
-          method: 'POST',
-          body: formData,
-        })
-          .then(response => {
-            if (!response.ok) {
-              return response.json().then(err => {
-                throw new Error(err.detail || 'Failed to process PDF');
-              });
-            }
-            return response.json();
-          })
-          .then(data => {
-            setInputText(data.text);
-            setIsProcessing(false);
-          })
-          .catch(err => {
-            setError(err.message || 'Failed to process PDF file.');
-            setIsProcessing(false);
-          });
-      }
-    }
+  const returnToDemo = () => {
+    setMode('demo');
+    setPhase(0);
+    setIsPaused(false);
+    setError(null);
   };
 
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
+  const copyResult = async () => {
+    if (!primaryResult?.text) return;
+    await navigator.clipboard.writeText(primaryResult.text);
   };
 
-  const copyToClipboard = () => {
-    if (hasOutput && outputResult) {
-      navigator.clipboard.writeText(outputResult.text);
-    }
-  };
-
-  const downloadText = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const downloadResult = () => {
+    if (!primaryResult?.text) return;
+    const blob = new Blob([primaryResult.text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = filename;
+    link.download = 'zyntalic-dual-trace.txt';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
-  const exportVisible = () => {
-    if (!hasOutput || !outputResult) return;
-    downloadText(outputResult.text, 'zyntalic_export.txt');
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const extension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (!['.txt', '.md'].includes(extension)) {
+      setError('This polished preview accepts TXT or MD directly. PDF extraction remains available through the API.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (readEvent) => {
+      setInputText(String(readEvent.target?.result || ''));
+      setError(null);
+    };
+    reader.onerror = () => setError('Could not read that file.');
+    reader.readAsText(file);
   };
 
-  const exportZyntalicOnly = () => {
-    if (!hasOutput || !outputResult) return;
-    const blocks = outputResult.text.split(/\n\s*\n/);
-    const zOnly = blocks
-      .map((block) => {
-        const lines = block.split(/\n/);
-        const arrow = lines.find((l) => l.trim().startsWith('→'));
-        if (arrow) {
-          return arrow.replace(/^.*→\s?/, '').trim();
-        }
-        // Fallback: if no arrow, return last line
-        return lines[lines.length - 1]?.trim() || '';
-      })
-      .filter(Boolean)
-      .join('\n');
-    downloadText(zOnly, 'zyntalic_only.txt');
-  };
+  const frameNames = primaryResult?.sidecar?.frames?.map((frame) => frame.anchor).slice(0, 3) || [];
 
   return (
-    <div className="min-h-screen flex flex-col text-slate-200 selection:bg-indigo-500/30">
-      {/* Header */}
-      <header className="border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4 group cursor-default">
-            <img
-              src="/favicon.svg"
-              alt=""
-              aria-hidden="true"
-              className="w-10 h-10 rounded-lg shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-all duration-300 group-hover:scale-105 group-hover:rotate-3"
-            />
+    <div className="min-h-screen text-slate-100 selection:bg-cyan-300/20">
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#05070d]/78 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-xl bg-cyan-300/20 blur-lg" />
+              <img src="/favicon.svg" alt="Zyntalic" className="relative h-9 w-9 rounded-xl" />
+            </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-white transition-colors group-hover:text-indigo-400">Zyntalic Flow</h1>
-              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-[0.2em] -mt-1">Deterministic Semantic Engine</p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold tracking-[0.18em] text-white">ZYNTALIC</span>
+                <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">
+                  Dual trace
+                </span>
+              </div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-600">Synthetic language engine</p>
             </div>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="hidden md:flex flex-col items-end">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-sm shadow-green-500/50"></span>
-                <span className="text-xs font-semibold text-slate-400">System Online</span>
-              </div>
-              <span className="text-[10px] text-slate-600 mono">v0.3-beta.build_812</span>
-            </div>
+
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span className="hidden sm:inline">Public transformation traces · not private chain-of-thought</span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-slate-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />
+              live
+            </span>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Settings */}
-        <aside className="lg:col-span-3 space-y-6">
-          <SettingsBar config={config} onChange={(upd) => setConfig(prev => ({ ...prev, ...upd }))} />
-          
-            <div className="bg-slate-900/30 border border-slate-800/50 p-6 rounded-2xl hover:bg-slate-900/40 transition-colors duration-300">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Diagnostics</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between text-xs group">
-                <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Temperature</span>
-                <span className="mono text-slate-300 tabular-nums">{config.mirror.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-xs group">
-                <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Latency</span>
-                <span className="mono text-slate-300 tabular-nums">{latencyMs ?? '--'}ms</span>
-              </div>
-              <div className="flex justify-between text-xs group">
-                <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Speed</span>
-                <span className="mono text-slate-300 tabular-nums">
-                  {speedLabel}{msPerChar ? ` · ${msPerChar.toFixed(1)} ms/char` : ''}
-                </span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs group">
-                  <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Time to Finish</span>
-                  <span className="mono text-slate-300 tabular-nums">{latencyMs ?? '--'}ms</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-slate-800/70 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 transition-all duration-500"
-                    style={{ width: `${latencyPct}%` }}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-between text-xs group">
-                <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Confidence</span>
-                <span className="mono text-slate-300 tabular-nums">{((outputResult?.confidence ?? 0) * 100).toFixed(1)}%</span>
-              </div>
-              <div className="flex justify-between text-xs group">
-                <span className="text-slate-500 group-hover:text-slate-400 transition-colors">Entropy</span>
-                <span className="mono text-slate-300 tabular-nums">{(1 - config.mirror).toFixed(2)}</span>
-              </div>
+      <main className="mx-auto max-w-7xl px-4 pb-20 pt-10 sm:px-6 sm:pt-14">
+        <section className="mb-10 grid gap-8 lg:grid-cols-[1.1fr_.9fr] lg:items-end">
+          <div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+              plaintext → dual transform → Zyntalic
             </div>
+            <h1 className="max-w-4xl text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">
+              Watch language split,
+              <span className="text-slate-500"> disagree, and converge.</span>
+            </h1>
           </div>
-        </aside>
+          <p className="max-w-xl text-sm leading-6 text-slate-400 lg:justify-self-end lg:text-base">
+            The interface now demonstrates the engine before asking anything from the user. Two deterministic public traces evolve in parallel, then settle on the generated surface.
+          </p>
+        </section>
 
-        {/* Right: Workspace */}
-        <div className="lg:col-span-9 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[500px]">
-            {/* Source Card */}
-            <div className="flex flex-col bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:border-indigo-500/30 hover:shadow-indigo-500/5 group">
-              <div className="bg-slate-800/30 px-6 py-4 flex justify-between items-center group-hover:bg-slate-800/50 transition-colors">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Source Input</span>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={triggerFileUpload}
-                    className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 active:scale-90"
-                    title="Upload File"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                  </button>
-                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".txt,.md,.pdf" />
-                  <button 
-                    onClick={() => {
-                      setInputText('');
-                      setOutputResult(null);
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all duration-200 active:scale-90"
-                    title="Clear"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <textarea 
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Initialize semantic stream by typing or dragging a file..."
-                className="flex-1 bg-transparent p-6 text-lg leading-relaxed focus:outline-none resize-none placeholder:text-slate-700 mono transition-all duration-300 focus:placeholder:opacity-50"
-              />
+        <section className="zy-theatre overflow-hidden rounded-[30px] border border-white/10 bg-[#080b13]/86 shadow-[0_40px_100px_rgba(0,0,0,.42)]">
+          <div className="flex flex-col gap-4 border-b border-white/5 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <div className="flex items-center gap-3">
+              <span className={`rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.22em] ${mode === 'live' ? 'bg-emerald-300/10 text-emerald-200 ring-1 ring-emerald-300/20' : 'bg-white/5 text-slate-400 ring-1 ring-white/10'}`}>
+                {mode === 'live' ? 'live run' : 'autoplay demo'}
+              </span>
+              <span className="text-xs text-slate-600">{mode === 'demo' ? `sequence 0${demoIndex + 1}` : 'two API passes'}</span>
             </div>
 
-            {/* Target Card */}
-            <div className="flex flex-col bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 hover:border-indigo-500/30 hover:shadow-indigo-500/5 group relative">
-              <div className="bg-slate-800/30 px-6 py-4 flex justify-between items-center group-hover:bg-slate-800/50 transition-colors">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Target Surface</span>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={copyToClipboard}
-                    disabled={!hasOutput}
-                    className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 disabled:opacity-30 active:scale-90"
-                    title="Copy Results"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-3 8h3m-3 4h3m-6-4h.01M9 16h.01" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={exportVisible}
-                    disabled={!hasOutput}
-                    className="px-3 py-1 text-xs font-semibold rounded-md border border-slate-700 text-slate-300 hover:border-indigo-500 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all duration-200 disabled:opacity-30"
-                    title="Export exactly what is shown"
-                  >
-                    Export shown
-                  </button>
-                  <button
-                    onClick={exportZyntalicOnly}
-                    disabled={!hasOutput}
-                    className="px-3 py-1 text-xs font-semibold rounded-md border border-slate-700 text-slate-300 hover:border-emerald-500 hover:text-emerald-200 hover:bg-emerald-500/10 transition-all duration-200 disabled:opacity-30"
-                    title="Export Zyntalic text only"
-                  >
-                    Export Zyntalic
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 p-6 text-lg leading-relaxed mono whitespace-pre-wrap overflow-y-auto">
-                {isProcessing ? (
-                  <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-500 animate-fade-in-up">
-                    <div className="w-12 h-1 bg-indigo-500/10 rounded-full relative overflow-hidden">
-                      <div className="absolute inset-y-0 left-0 bg-indigo-500 w-1/2 animate-[shimmer_1.5s_infinite] shadow-[0_0_10px_rgba(99,102,241,0.8)]"></div>
-                    </div>
-                    <span className="text-sm font-medium tracking-wide">Syncing Neural Context...</span>
-                  </div>
-                ) : outputResult ? (
-                  <div className="text-slate-200 animate-fade-in-up space-y-4">
-                    {(outputResult.rows.length > 0
-                      ? outputResult.rows
-                      : [{ text: outputResult.text, sidecar: outputResult.sidecar }]
-                    ).map((row, index) => (
-                      <div
-                        key={`${index}-${row.text.slice(0, 24)}`}
-                        className="rounded-2xl border border-slate-800/70 bg-slate-950/40 p-4"
-                      >
-                        <div className="flex gap-4">
-                          <SigilColumn
-                            sigil={row.sidecar?.sigil ?? null}
-                            type={row.sidecar?.sigil_type ?? null}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.18em]">
-                              {row.sidecar?.scope_signature && (
-                                <span className="rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-indigo-200">
-                                  Scope {row.sidecar.scope_signature}
-                                </span>
-                              )}
-                              {row.sidecar?.anchor_mode && row.sidecar.anchor_mode !== 'auto' && (
-                                <span className="rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-2 py-1 text-fuchsia-200">
-                                  {row.sidecar.anchor_mode}
-                                </span>
-                              )}
-                              {row.sidecar?.register && (
-                                <span className="rounded-full border border-slate-700 bg-slate-900/80 px-2 py-1 text-slate-300">
-                                  {row.sidecar.register}
-                                </span>
-                              )}
-                              {row.sidecar?.dialect && row.sidecar.dialect !== 'standard' && (
-                                <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200">
-                                  {row.sidecar.dialect}
-                                </span>
-                              )}
-                              {row.sidecar?.pivot && row.sidecar.pivot !== 'neutral' && (
-                                <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-200">
-                                  {row.sidecar.pivot}
-                                </span>
-                              )}
-                              {(row.sidecar?.frames ?? []).map((frame) => (
-                                <span
-                                  key={`${frame.id}-${frame.anchor}`}
-                                  className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-200"
-                                >
-                                  {frame.id}: {formatAnchorLabel(frame.anchor)}
-                                </span>
-                              ))}
-                              {(row.sidecar?.selected_anchors ?? [])
-                                .filter((anchor) => !(row.sidecar?.frames ?? []).some((frame) => frame.anchor === anchor))
-                                .map((anchor) => (
-                                  <span
-                                    key={`selected-${anchor}`}
-                                    className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200"
-                                  >
-                                    {formatAnchorLabel(anchor)}
-                                  </span>
-                                ))}
-                            </div>
-                            <div className="whitespace-pre-wrap">
-                              {row.text}
-                            </div>
-                            {row.sidecar?.evidentiality && (
-                              <div className="mt-3 text-[10px] uppercase tracking-[0.22em] text-slate-500">
-                                Evidentiality: {row.sidecar.evidentiality}
-                              </div>
-                            )}
-                            {(((row.sidecar?.selected_anchors?.length ?? 0) > 0) || ((row.sidecar?.frames?.length ?? 0) > 0)) && (
-                              <AnchorBars weights={row.sidecar?.anchor_weights ?? []} />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-slate-700 italic transition-opacity duration-500">Waiting for translation output...</span>
-                )}
-                {error && (
-                  <div className="text-red-400 text-sm mt-4 p-4 bg-red-400/5 border border-red-400/20 rounded-lg flex justify-between items-start gap-3 animate-fade-in-up">
-                    <span>{error}</span>
-                    <button 
-                      onClick={() => setError(null)}
-                      className="p-1 hover:bg-red-400/10 rounded transition-colors shrink-0"
-                      aria-label="Clear error"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-              {showMirror && (
-                <div className="border-t border-slate-800/60 bg-slate-950/40 p-6">
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mirror Readback</div>
-                  <div className="mt-3 text-slate-200 mono whitespace-pre-wrap">
-                    {outputResult?.mirrorText}
-                  </div>
-                </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPaused((paused) => !paused)}
+                className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/[0.06]"
+              >
+                {isPaused ? 'Play' : 'Pause'}
+              </button>
+              {mode === 'live' && (
+                <button
+                  type="button"
+                  onClick={returnToDemo}
+                  className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/[0.06]"
+                >
+                  Demo loop
+                </button>
               )}
             </div>
           </div>
 
-          {/* Action Footer */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-2">
-            <div className="flex items-center gap-6 text-slate-500">
-              <div className="flex items-center gap-2 group cursor-help">
-                <div className="w-3 h-3 border-2 border-slate-700 rounded-full flex items-center justify-center group-hover:border-indigo-500 transition-colors duration-300">
-                  <div className="w-1 h-1 bg-slate-500 group-hover:bg-indigo-500 rounded-full"></div>
+          <div className="relative p-5 sm:p-7 lg:p-9">
+            <div className="zy-grid absolute inset-0 opacity-35" />
+            <div className="relative space-y-6">
+              <div className="rounded-2xl border border-white/8 bg-black/20 p-5 sm:p-6">
+                <div className="mb-3 flex items-center justify-between gap-4">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Plaintext</span>
+                  <span className="mono text-[10px] text-slate-700">SOURCE / UTF-8</span>
                 </div>
-                <span className="text-xs uppercase font-bold tracking-widest group-hover:text-slate-400 transition-colors">Secure Transmission</span>
+                <div className="mono min-h-12 text-lg leading-8 text-slate-200 sm:text-xl">{source || 'Awaiting input…'}</div>
               </div>
-              <div className="flex items-center gap-2 group cursor-help">
-                 <svg className="w-4 h-4 group-hover:text-indigo-500 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                 </svg>
-                 <span className="text-xs uppercase font-bold tracking-widest group-hover:text-slate-400 transition-colors">Encrypted flow</span>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <article className="group relative overflow-hidden rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.035] p-5 sm:p-6">
+                  <div className="zy-scan absolute inset-y-0 w-24 bg-gradient-to-r from-transparent via-cyan-200/[0.06] to-transparent" style={{ left: `${Math.max(-20, pathAProgress * 112 - 10)}%` }} />
+                  <div className="relative">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-300/10 text-[10px] font-bold text-cyan-200">A</span>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200/80">semantic trace</span>
+                      </div>
+                      <span className="max-w-[45%] truncate text-[10px] text-slate-600">{traceLabelA}</span>
+                    </div>
+                    <div className="mono min-h-28 whitespace-pre-wrap break-words text-base leading-7 text-slate-200 sm:text-lg">
+                      {traceA || '…'}
+                    </div>
+                  </div>
+                </article>
+
+                <article className="group relative overflow-hidden rounded-2xl border border-violet-300/15 bg-violet-300/[0.03] p-5 sm:p-6">
+                  <div className="zy-scan absolute inset-y-0 w-24 bg-gradient-to-r from-transparent via-violet-200/[0.06] to-transparent" style={{ right: `${Math.max(-20, pathBProgress * 112 - 10)}%` }} />
+                  <div className="relative">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-violet-300/20 bg-violet-300/10 text-[10px] font-bold text-violet-200">B</span>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-200/80">challenger trace</span>
+                      </div>
+                      <span className="max-w-[45%] truncate text-[10px] text-slate-600">{traceLabelB}</span>
+                    </div>
+                    <div className="mono min-h-28 whitespace-pre-wrap break-words text-base leading-7 text-slate-200 sm:text-lg">
+                      {traceB || '…'}
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] p-5 sm:p-6">
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/50 to-transparent" />
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                      <span className="absolute h-2 w-2 animate-ping rounded-full bg-cyan-300/50" />
+                      <span className="relative h-2 w-2 rounded-full bg-cyan-200" />
+                    </span>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-300">Converged surface</div>
+                      <div className="text-[10px] text-slate-600">primary engine output</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                    <span className="rounded-full border border-white/8 bg-black/20 px-2 py-1">surface overlap {agreement}%</span>
+                    {latency !== null && latency > 0 && (
+                      <span className="rounded-full border border-white/8 bg-black/20 px-2 py-1">{latency} ms</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mono min-h-20 whitespace-pre-wrap break-words text-xl leading-9 text-white sm:text-2xl">
+                  {finalSurface || '…'}
+                </div>
+
+                {readback && phase >= 86 && (
+                  <div className="mt-5 border-t border-white/5 pt-4">
+                    <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.22em] text-slate-600">Engine readback</div>
+                    <div className="text-sm leading-6 text-slate-400">{readback}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/5">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-300/70 via-violet-300/70 to-white/70 transition-[width] duration-100"
+                    style={{ width: `${Math.min(100, phase)}%` }}
+                  />
+                </div>
+                <span className="mono w-10 text-right text-[10px] text-slate-600">{Math.round(Math.min(100, phase))}%</span>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div className="flex gap-4">
-              <button
-                onClick={exportVisible}
-                disabled={!hasOutput}
-                className="px-6 py-5 rounded-2xl font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700 hover:border-indigo-500/50"
-              >
-                Download Result
-              </button>
+        <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
+          <div className="rounded-[26px] border border-white/10 bg-[#080b13]/72 p-5 sm:p-7">
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-600">Your turn</span>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">Feed the duel a sentence.</h2>
+              </div>
+              <span className="text-xs text-slate-600">Ctrl / ⌘ + Enter to run</span>
+            </div>
 
-              <button 
-                onClick={handleTranslate}
-                disabled={isProcessing || !inputText.trim()}
-                className="group relative inline-flex items-center gap-3 px-10 py-5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:opacity-50 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 transition-all duration-300 active:scale-[0.98] hover:-translate-y-1 overflow-hidden"
-              >
-                <span className="relative z-10">{isProcessing ? 'Processing...' : 'Initialize Flow'}</span>
-                <svg 
-                  className={`w-5 h-5 relative z-10 transition-transform duration-300 ${isProcessing ? 'animate-spin' : 'group-hover:translate-x-1'}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
+            <textarea
+              value={inputText}
+              onChange={(event) => setInputText(event.target.value)}
+              onKeyDown={(event) => {
+                if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                  event.preventDefault();
+                  void handleTranslate();
+                }
+              }}
+              placeholder="A new idea enters as ordinary language…"
+              className="mono min-h-36 w-full resize-y rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-base leading-7 text-slate-200 outline-none transition placeholder:text-slate-700 focus:border-cyan-300/30 focus:bg-black/30"
+            />
+
+            {error && (
+              <div className="mt-4 rounded-xl border border-rose-300/15 bg-rose-300/[0.05] px-4 py-3 text-sm leading-5 text-rose-200">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/[0.06]"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-400/0 via-white/10 to-indigo-400/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
-                <div className="absolute -inset-1 bg-indigo-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  Open TXT / MD
+                </button>
+                <input ref={fileInputRef} type="file" accept=".txt,.md" className="hidden" onChange={handleFileUpload} />
+                {primaryResult && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void copyResult()}
+                      className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/[0.06]"
+                    >
+                      Copy surface
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadResult}
+                      className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/[0.06]"
+                    >
+                      Download
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleTranslate()}
+                disabled={isProcessing || !inputText.trim()}
+                className="group inline-flex min-w-44 items-center justify-center gap-3 rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <span>{isProcessing ? 'Splitting traces…' : 'Run dual trace'}</span>
+                <span className={`text-base transition-transform ${isProcessing ? 'animate-pulse' : 'group-hover:translate-x-0.5'}`}>→</span>
               </button>
             </div>
           </div>
-        </div>
+
+          <aside className="space-y-4">
+            <div className="rounded-[26px] border border-white/10 bg-[#080b13]/72 p-5">
+              <div className="mb-4 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-600">Run telemetry</div>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500">Mode</span>
+                  <span className="text-slate-200">{mode === 'live' ? 'Dual API' : 'Autoplay'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500">Trace passes</span>
+                  <span className="mono text-slate-200">2</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500">Mirror rate</span>
+                  <span className="mono text-slate-200">{config.mirror.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500">Surface overlap</span>
+                  <span className="mono text-slate-200">{agreement}%</span>
+                </div>
+              </div>
+
+              {frameNames.length > 0 && (
+                <div className="mt-5 border-t border-white/5 pt-4">
+                  <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600">Active frames</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {frameNames.map((frame) => (
+                      <span key={frame} className="rounded-full border border-cyan-300/10 bg-cyan-300/[0.04] px-2 py-1 text-[10px] text-cyan-100/70">
+                        {frame.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <details className="group rounded-[26px] border border-white/10 bg-[#080b13]/72 p-5">
+              <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-300">
+                Engine controls
+                <span className="text-slate-600 transition group-open:rotate-45">＋</span>
+              </summary>
+              <div className="mt-5 border-t border-white/5 pt-5">
+                <SettingsBar config={config} onChange={(update) => setConfig((current) => ({ ...current, ...update }))} />
+              </div>
+            </details>
+          </aside>
+        </section>
+
+        <section className="mt-12 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-5">
+            <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.22em] text-cyan-200/60">01 · observe</div>
+            <p className="text-sm leading-6 text-slate-400">The product explains itself in motion before the first click.</p>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-5">
+            <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.22em] text-violet-200/60">02 · diverge</div>
+            <p className="text-sm leading-6 text-slate-400">A semantic path and a challenger path produce inspectable public surfaces.</p>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-5">
+            <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.22em] text-white/50">03 · converge</div>
+            <p className="text-sm leading-6 text-slate-400">The primary Zyntalic result settles only after the duel has been shown.</p>
+          </div>
+        </section>
       </main>
 
-      <footer className="py-8 border-t border-slate-800/60 bg-slate-950 mt-12 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-slate-600 text-xs">
-            Powered by <span className="text-slate-400 font-bold hover:text-indigo-400 transition-colors cursor-default">Zyntalic Engine v0.3 (Experimental)</span>. 
-            Proprietary Semantic Mapping Architecture.
-          </p>
-          <div className="flex gap-8 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-            <a href="#" className="hover:text-indigo-400 transition-all duration-200 relative group">
-              Documentation
-              <span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-500 transition-all duration-200 group-hover:w-full"></span>
-            </a>
-            <a href="#" className="hover:text-indigo-400 transition-all duration-200 relative group">
-              Safety Protocols
-              <span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-500 transition-all duration-200 group-hover:w-full"></span>
-            </a>
-            <a href="#" className="hover:text-indigo-400 transition-all duration-200 relative group">
-              API Keys
-              <span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-500 transition-all duration-200 group-hover:w-full"></span>
-            </a>
-          </div>
+      <footer className="border-t border-white/5 bg-black/20 py-7">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 text-xs text-slate-600 sm:px-6 md:flex-row md:items-center md:justify-between">
+          <span>Zyntalic Flow · experimental synthetic-language research interface</span>
+          <span className="mono">UI / dual-trace cinematic prototype</span>
         </div>
       </footer>
     </div>
