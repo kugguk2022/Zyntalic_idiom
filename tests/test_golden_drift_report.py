@@ -1,9 +1,15 @@
 import hashlib
+import importlib.util
 import json
+from pathlib import Path
 
 import pytest
 
-from scripts import report_golden_drift
+MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "report_golden_drift.py"
+SPEC = importlib.util.spec_from_file_location("report_golden_drift", MODULE_PATH)
+assert SPEC and SPEC.loader
+report_golden_drift = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(report_golden_drift)
 
 
 def _sha256(text: str) -> str:
