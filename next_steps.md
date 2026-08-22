@@ -27,6 +27,40 @@ The goal is a toolkit that is:
 
 Use `[ ]` for not started, `[~]` in progress / proposed start, `[x]` done. Builds directly on existing BACKLOG.md P0-P3 while expanding toward narrative generation and film/novel workflows.
 
+### Immediate release plan: v0.5.0 visible compiler
+
+`v0.4.0` made compiler data accessible through readable CLI output, per-sentence
+JSON exports, and a bundled local dual display. The next release should make the
+compilation process itself visible without presenting decorative animation as
+real computation.
+
+- [ ] Port the deterministic Hugging Face character-morph treatment into the bundled local UI.
+- [ ] Present two independently configured deterministic channels concurrently.
+- [ ] Define genuine compiler checkpoints: tokenization, semantic projection,
+  anchor convergence, morphology, and final surface realization.
+- [ ] Return an anchor-weight snapshot and intermediate surface for each checkpoint.
+- [ ] Animate characters from the actual intermediate surfaces rather than interpolating
+  only the final result.
+- [ ] Drive the orbital visualization from convergence and channel disagreement.
+- [ ] Export the full compilation trajectory per input file, including configuration,
+  timings, intermediate weights, final surfaces, and receipt metadata.
+- [ ] Keep the complete v0.5.0 deterministic experience local and usable without an API key.
+
+**Effort estimate:** 1–2 hours for cinematic character morphing, 1–2 hours for
+the two-channel interface, 4–8 hours for truthful intermediate trajectories,
+and 45–90 minutes for tests, packaging, and PyPI deployment. Allow 15–45 minutes
+for authenticated GitHub/Hugging Face deployment. Total: approximately 7–12
+focused hours.
+
+**Recommended sequencing:** when other launches are active, cap the same-day
+Zyntalic work at two hours for the cinematic and dual-channel shell. Reserve a
+dedicated 5–7 hour block the following day for real compiler trajectories, then
+one hour for packaging and deployment.
+
+**Release gate:** do not ship weight motion that merely implies changing semantic
+state. Every visible weight transition in v0.5.0 must correspond to a recorded,
+reproducible compiler checkpoint.
+
 ### P0: Core Quality, Determinism & Rule Fidelity (Highest priority - stabilize foundation)
 Complete and harden what is already in progress per BACKLOG.md.
 

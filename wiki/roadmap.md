@@ -23,6 +23,41 @@ The roadmap combines the engineering backlog with the narrative-product proposal
 
 **Exit condition:** the language reference describes tested behavior, and optional backends cannot silently alter the deterministic baseline.
 
+## Near-term release: v0.5.0 visible compiler
+
+The objective is to bring the impact of the Hugging Face deterministic A/B
+experience into the installable local product while improving the honesty of
+the visualization.
+
+### Phase 1 — cinematic shell (2–4 hours)
+
+- deterministic per-character glyph mutation;
+- simultaneous A/B channels with independent engine and style controls;
+- source, final surfaces, timing, and sidecars visible together;
+- orbital motion driven by channel agreement and final anchor weights.
+
+### Phase 2 — truthful trajectories (4–8 hours)
+
+- explicit tokenization, projection, anchor-convergence, morphology, and surface checkpoints;
+- intermediate surfaces and anchor-weight snapshots produced by the compiler;
+- UI animation driven by those recorded checkpoints;
+- downloadable per-file trajectory and immutable final receipt;
+- performance work so optional embeddings do not freeze first paint.
+
+### Phase 3 — release and deployment (1–2 hours)
+
+- targeted trajectory, determinism, UI, packaging, and clean-wheel tests;
+- PyPI build and install verification;
+- authenticated GitHub and Hugging Face deployment.
+
+**Total estimate:** approximately 7–12 focused hours. If other products are
+shipping concurrently, complete only Phase 1 on the first day and reserve a
+dedicated block on the following day for Phases 2 and 3.
+
+**Exit condition:** every animated semantic-weight change maps to a reproducible
+compiler checkpoint. The interface must not represent interpolated decoration as
+live embedding computation.
+
 ## Then: narrative composition MVP
 
 Build composition as orchestration over existing primitives rather than a second language engine.
