@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zyntalic"
-version = "0.3.1"
+version = "0.4.0"
 description = "Deterministic synthetic-language toolkit (Zyntalic) with anchor priors and S-O-V-C surface order"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -57,6 +57,7 @@ include = ["zyntalic*", "apps*"]
 
 [tool.setuptools.package-data]
 zyntalic = ["resources/lexicon/*.json"]
+apps = ["web/static/*"]
 
 [tool.ruff]
 line-length = 100

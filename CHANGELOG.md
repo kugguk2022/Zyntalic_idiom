@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.0
+- Added a readable CLI format with visible semantic anchor weights.
+- Added per-sentence JSON file export with a machine-readable manifest.
+- Added a bundled local dual-display compiler with animated weight bars and timing.
+- Added the `zyntalic web` launcher for installs using the `web` extra.
+
 ## v0.3.1
 - Added permanent authorship and collaboration credits.
 - Expanded the PyPI-facing README with an absolute-link wiki guide.

@@ -44,6 +44,25 @@ python -m pip install zyntalic
 zyntalic translate "I see the river at night." --format plain
 ```
 
+For a readable source/target trace with anchor weights, use the default output:
+
+```bash
+zyntalic translate "I see the river at night."
+```
+
+Split a document into one structured JSON file per translated sentence:
+
+```bash
+zyntalic translate --input manuscript.txt --output-dir compiled
+```
+
+Launch the local dual-display compiler, with live anchor-weight bars and compile timing:
+
+```bash
+python -m pip install "zyntalic[web]"
+zyntalic web
+```
+
 From Python:
 
 ```python

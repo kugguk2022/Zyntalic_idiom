@@ -6,20 +6,16 @@
   <title>Zyntalic</title>
   <style>
     :root {
-      color-scheme: light;
-      --bg: #f2efe9;
-      --ink: #1b1b1b;
-      --muted: #5a5a5a;
-      --accent: #1f6f4a;
-      --panel: #ffffff;
-      --border: #d5cfc3;
-      --shadow: 0 10px 30px rgba(0,0,0,0.08);
+      color-scheme: dark;
+      --bg: #080910; --ink: #f8fafc; --muted: #94a3b8;
+      --accent: #22d3ee; --violet: #8b5cf6; --panel: #0d101a;
+      --border: #26314b; --shadow: 0 18px 60px rgba(0,0,0,.45);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "IBM Plex Serif", "Georgia", serif;
-      background: radial-gradient(circle at 10% 20%, #fff7ea 0%, #f2efe9 35%, #e7e0d4 100%);
+      background: radial-gradient(circle at 50% 10%, #172554 0%, #080910 48%);
       color: var(--ink);
     }
     .wrap {
@@ -56,7 +52,7 @@
       border-radius: 10px;
       border: 1px solid var(--border);
       color: var(--ink);
-      background: #fff;
+      background: #111522;
       font-size: 0.95rem;
     }
     .btn.primary {
@@ -65,10 +61,10 @@
       border-color: var(--accent);
     }
     code {
-      background: #f6f2ea;
+      background: #151a29;
       padding: 2px 6px;
       border-radius: 6px;
-      border: 1px solid #e5dfd4;
+      border: 1px solid var(--border);
     }
     .note {
       font-size: 0.9rem;
@@ -100,7 +96,7 @@
       padding: 12px;
       border-radius: 12px;
       border: 1px dashed var(--border);
-      background: #faf7f0;
+      background: #090c15;
       font-family: "IBM Plex Sans", "Arial", sans-serif;
       white-space: pre-wrap;
     }
@@ -114,13 +110,18 @@
     input[type="range"] {
       width: 180px;
     }
+    .weights { margin-top: 22px; display: grid; gap: 10px; }
+    .weight-head { display:flex; justify-content:space-between; color:var(--muted); font-size:.8rem; }
+    .track { height:7px; border-radius:9px; background:#182033; overflow:hidden; }
+    .fill { height:100%; background:linear-gradient(90deg,var(--violet),var(--accent)); transition:width .65s cubic-bezier(.2,.8,.2,1); }
+    .receipt { margin-top:18px; color:var(--muted); font: .78rem ui-monospace,monospace; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Zyntalic Translator (Fallback UI)</h1>
-      <p>The full React UI isn't built, so this lightweight translator is active.</p>
+      <h1>Zyntalic Dual Compiler</h1>
+      <p>Source and compiled language remain visible together; semantic anchor weights reform on every run.</p>
 
       <div class="row">
         <div>
@@ -132,6 +133,9 @@
           <div id="output" class="output">Waiting for input…</div>
         </div>
       </div>
+
+      <div id="weights" class="weights"></div>
+      <div id="receipt" class="receipt">No compilation yet.</div>
 
       <div class="controls">
         <label class="label">Engine:</label>
@@ -150,7 +154,7 @@
         <a class="btn" href="/docs">API Docs</a>
       </div>
 
-      <p class="note">Build the full UI any time: <code>cd zyntalic-flow && npm install && npm run build</code></p>
+      <p class="note">Every sentence can also be exported separately with <code>zyntalic translate --input text.txt --output-dir result</code>.</p>
     </div>
   </div>
   <script>
@@ -160,6 +164,8 @@
     const mirror = document.getElementById("mirror");
     const mirrorVal = document.getElementById("mirrorVal");
     const btn = document.getElementById("translateBtn");
+    const weights = document.getElementById("weights");
+    const receipt = document.getElementById("receipt");
 
     mirror.addEventListener("input", () => {
       mirrorVal.textContent = mirror.value;
@@ -171,7 +177,9 @@
         output.textContent = "Please enter text.";
         return;
       }
-      output.textContent = "Translating…";
+      output.textContent = "Compiling…";
+      weights.innerHTML = "";
+      const started = performance.now();
       try {
         const resp = await fetch("/translate", {
           method: "POST",
@@ -180,12 +188,21 @@
             text,
             mirror_rate: parseFloat(mirror.value),
             engine: engine.value,
-            zyntalic_only: true
+            zyntalic_only: false
           })
         });
         const data = await resp.json();
         if (data.rows && data.rows[0]) {
           output.textContent = data.rows.map(r => r.target).join("\n\n");
+          const combined = new Map();
+          data.rows.forEach(row => (row.anchors || []).forEach(([name, value]) =>
+            combined.set(name, Math.max(combined.get(name) || 0, Number(value) || 0))));
+          [...combined.entries()].sort((a,b) => b[1]-a[1]).slice(0,5).forEach(([name,value]) => {
+            const item = document.createElement("div");
+            item.innerHTML = `<div class="weight-head"><span>${name.replaceAll('_',' ')}</span><span>${(value*100).toFixed(2)}%</span></div><div class="track"><div class="fill" style="width:${Math.max(1,value*100)}%"></div></div>`;
+            weights.appendChild(item);
+          });
+          receipt.textContent = `compiled ${(performance.now()-started).toFixed(1)} ms · ${data.cached ? 'cache hit' : 'fresh weights'} · ${data.rows.length} record(s)`;
         } else {
           output.textContent = JSON.stringify(data, null, 2);
         }
