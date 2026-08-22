@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" role="img" aria-labelledby="title desc">
+  <title id="title">Online presence</title>
+  <desc id="desc">A warm black badge with a white spiral and monospaced online wordmark.</desc>
+  <rect width="360" height="80" rx="8" fill="#171510"/>
+  <path d="M35 42c-8-1-12-8-10-15 2-8 11-12 19-9 9 4 12 15 7 24-5 10-18 13-29 7-12-7-16-22-9-34"
+        fill="none" stroke="#f8f7f2" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="35" cy="31" r="5.5" fill="none" stroke="#f8f7f2" stroke-width="3"/>
+  <text x="63" y="51" fill="#f8f7f2" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="35" letter-spacing="1">nline</text>
+</svg>

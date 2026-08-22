@@ -180,3 +180,7 @@ Corpus and fixture contributions must be redistributable and must not contain pe
 ## License
 
 Released under the [MIT License](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/LICENSE).
+
+<img src="https://raw.githubusercontent.com/kugguk2022/Zyntalic_idiom/main/assets/online-presence.svg" alt="Online presence" width="180">
+
+<sub>The “online presence” mark is decorative project artwork and does not modify or restrict the MIT License.</sub>
