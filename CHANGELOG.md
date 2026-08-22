@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.1
+- Added permanent authorship and collaboration credits.
+- Expanded the PyPI-facing README with an absolute-link wiki guide.
+- Added direct PyPI installation instructions.
+
 ## Unreleased
 - Added a comprehensive project wiki covering the idea, evolution, architecture,
   current capabilities, terminology, repository organization, and roadmap.

@@ -4,12 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zyntalic"
-version = "0.3.0"
+version = "0.3.1"
 description = "Deterministic synthetic-language toolkit (Zyntalic) with anchor priors and S-O-V-C surface order"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "zolton" }]
+authors = [
+  { name = "ZoltF" },
+  { name = "OpenAI Codex (Coda)" },
+]
 keywords = ["synthetic-language", "conlang", "translation", "schelling-points", "deterministic"]
 classifiers = [
   "Development Status :: 3 - Alpha",

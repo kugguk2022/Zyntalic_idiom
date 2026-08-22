@@ -1,7 +1,7 @@
 # Zyntalic
 
 <p align="center">
-  <img src="zyntalic-flow/public/favicon.svg" alt="Zyntalic logo" width="360">
+  <img src="https://raw.githubusercontent.com/kugguk2022/Zyntalic_idiom/main/zyntalic-flow/public/favicon.svg" alt="Zyntalic logo" width="360">
 </p>
 
 <p align="center">
@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/kugguk2022/Zyntalic_idiom/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/kugguk2022/Zyntalic_idiom/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="https://github.com/kugguk2022/Zyntalic_idiom/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB.svg">
   <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-orange.svg">
 </p>
@@ -30,7 +30,7 @@ The baseline runs locally with NumPy. Embeddings, NLP, PDF extraction, the web A
 - **Controllable:** anchor mode, frames, register, dialect, evidentiality, engine, and mirror rate are explicit options.
 - **Integrable:** use the Python API, CLI, authenticated REST API, React interface, or desktop launcher.
 
-Read [the idea](wiki/idea.md), [core concepts](wiki/core-concepts.md), and the honest [current-state inventory](wiki/current-state.md) for the full project context.
+Read [the idea](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/idea.md), [core concepts](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/core-concepts.md), and the honest [current-state inventory](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/current-state.md) for the full project context.
 
 ## Quick start
 
@@ -39,7 +39,7 @@ Read [the idea](wiki/idea.md), [core concepts](wiki/core-concepts.md), and the h
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-python -m pip install -e .
+python -m pip install zyntalic
 
 zyntalic translate "I see the river at night." --format plain
 ```
@@ -90,7 +90,7 @@ curl --fail-with-body http://127.0.0.1:8000/v1/translate \
 | `POST /v1/extract` | Extract UTF-8 text from PDF, TXT, or Markdown | API key |
 | `GET /docs` | Interactive OpenAPI reference | Public |
 
-The in-process rate limiter is suitable for one server process. Multi-worker and distributed deployments should enforce shared limits at a gateway. Configure limits, CORS, cache location, and authentication through the variables documented in [.env.example](.env.example).
+The in-process rate limiter is suitable for one server process. Multi-worker and distributed deployments should enforce shared limits at a gateway. Configure limits, CORS, cache location, and authentication through the variables documented in [.env.example](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/.env.example).
 
 ## Development
 
@@ -110,7 +110,7 @@ npm ci
 npm run build
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for environment setup, test selection, deterministic-change review, and pull-request expectations.
+See [CONTRIBUTING.md](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/CONTRIBUTING.md) for environment setup, test selection, deterministic-change review, and pull-request expectations.
 
 ## Project structure
 
@@ -129,25 +129,35 @@ zyntalic_docs/         Generated language-design reference
 zyntalic-flow/         React/Vite frontend
 ```
 
-The [repository guide](wiki/repository-guide.md) defines ownership, safe cleanup practices, legacy directories, and generated artifacts.
+The [repository guide](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/repository-guide.md) defines ownership, safe cleanup practices, legacy directories, and generated artifacts.
 
-## Documentation
+## Wiki and documentation
 
-- [Project wiki](wiki/README.md)
-- [Architecture](wiki/architecture.md)
-- [Language reference](zyntalic_docs/README.md)
-- [Dataset pipeline](DATASET.md)
-- [Embeddings](EMBEDDINGS.md)
-- [Roadmap](wiki/roadmap.md)
-- [Changelog](CHANGELOG.md)
-- [Security policy](SECURITY.md)
+- [Project wiki](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/README.md) — the complete guide and reading map.
+- [Idea and vision](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/idea.md) — motivation and design intent.
+- [Core concepts](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/core-concepts.md) — anchors, ordering, context tails, and deterministic generation.
+- [Architecture](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/architecture.md) — engine and application structure.
+- [Current state](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/current-state.md) — implemented capabilities and limitations.
+- [Evolution](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/evolution.md) — how the language and toolkit developed.
+- [Roadmap](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/roadmap.md) — planned work.
+- [Language reference](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/zyntalic_docs/README.md) — grammar and language-design documentation.
+- [Dataset pipeline](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/DATASET.md)
+- [Embeddings](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/EMBEDDINGS.md)
+- [Changelog](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/CHANGELOG.md)
+- [Security policy](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/SECURITY.md)
+
+## Authors
+
+Zyntalic is created and maintained by **ZoltF**, in collaboration with
+**OpenAI Codex ("Coda")**. See the permanent
+[authors record](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/AUTHORS.md).
 
 ## Scope and limitations
 
 Zyntalic is a creative toolkit, not a linguistically complete English parser or a translation system for a naturally spoken language. The default parser intentionally uses stable heuristics. The generated language reference contains design material that should be backed by executable tests before being treated as a compatibility guarantee.
 
-Corpus and fixture contributions must be redistributable and must not contain personal or confidential information. See [CONTRIBUTING.md](CONTRIBUTING.md#data-and-lexicon-contributions).
+Corpus and fixture contributions must be redistributable and must not contain personal or confidential information. See [CONTRIBUTING.md](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/CONTRIBUTING.md#data-and-lexicon-contributions).
 
 ## License
 
-Released under the [MIT License](LICENSE).
+Released under the [MIT License](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/LICENSE).
