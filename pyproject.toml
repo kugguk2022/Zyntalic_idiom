@@ -35,6 +35,8 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/kugguk2022/Zyntalic_idiom"
 Documentation = "https://github.com/kugguk2022/Zyntalic_idiom/tree/main/wiki"
+Package = "https://pypi.org/project/zyntalic/"
+Demo = "https://huggingface.co/spaces/kugguk/zyntalic-dual"
 Issues = "https://github.com/kugguk2022/Zyntalic_idiom/issues"
 Source = "https://github.com/kugguk2022/Zyntalic_idiom"
 

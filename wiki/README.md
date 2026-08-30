@@ -19,6 +19,18 @@ This wiki separates three things that are easy to conflate:
 7. [Repository guide](repository-guide.md) explains where things belong and how to contribute without adding more root-level clutter.
 8. [Glossary](glossary.md) provides a shared vocabulary.
 
+## Install and explore
+
+Zyntalic is published on [PyPI](https://pypi.org/project/zyntalic/) as `zyntalic` for Python 3.10 and newer:
+
+```bash
+python -m pip install zyntalic
+```
+
+Install `zyntalic[web]` to include the local web application. The PyPI project page contains the current release, release history, dependency metadata, and downloadable package files.
+
+[Zyntalic Dual on Hugging Face Spaces](https://huggingface.co/spaces/kugguk/zyntalic-dual) is a related machine-only A/B language experiment. It is maintained as a separate prototype and should not be treated as the deterministic package runtime or its hosted replacement.
+
 ## Language references
 
 The generated language reference remains in [`zyntalic_docs/`](../zyntalic_docs/README.md). It covers grammar, phonology, morphology, syntax, semantics, the lexicon, and a tutorial. Treat it as a design reference: some examples and statistics were generated in December 2025 and should be revalidated against the current engine before being presented as guarantees.
@@ -26,6 +38,8 @@ The generated language reference remains in [`zyntalic_docs/`](../zyntalic_docs/
 ## Project documents
 
 - [README](../README.md): installation and common entry points
+- [PyPI package](https://pypi.org/project/zyntalic/): published releases and package metadata
+- [Hugging Face Space](https://huggingface.co/spaces/kugguk/zyntalic-dual): related Zyntalic Dual prototype
 - [Backlog](../BACKLOG.md): original engineering backlog
 - [Next-steps proposal](../next_steps.md): narrative-product proposal from June 2026
 - [Dataset guide](../DATASET.md): corpus-generation pipeline

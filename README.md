@@ -10,6 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/kugguk2022/Zyntalic_idiom/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/kugguk2022/Zyntalic_idiom/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://pypi.org/project/zyntalic/"><img alt="PyPI" src="https://img.shields.io/pypi/v/zyntalic.svg?logo=pypi&amp;label=PyPI"></a>
+  <a href="https://huggingface.co/spaces/kugguk/zyntalic-dual"><img alt="Hugging Face Space" src="https://img.shields.io/badge/Hugging%20Face-Zyntalic%20Dual-FFD21E?logo=huggingface&amp;logoColor=000"></a>
   <a href="https://github.com/kugguk2022/Zyntalic_idiom/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB.svg">
   <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-orange.svg">
@@ -33,6 +35,8 @@ The baseline runs locally with NumPy. Embeddings, NLP, PDF extraction, the web A
 Read [the idea](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/idea.md), [core concepts](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/core-concepts.md), and the honest [current-state inventory](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/current-state.md) for the full project context.
 
 ## Quick start
+
+Zyntalic is published on [PyPI](https://pypi.org/project/zyntalic/) as `zyntalic` and requires Python 3.10 or newer. PyPI provides the current release, release history, and downloadable package files.
 
 ### Python and CLI
 
@@ -72,6 +76,8 @@ result = translate_sentence("I see the river at night.", engine="core", mirror_r
 print(result["target"])
 print(result["sidecar"])
 ```
+
+For a related browser-based experiment, visit [Zyntalic Dual on Hugging Face Spaces](https://huggingface.co/spaces/kugguk/zyntalic-dual). It is a separate machine-only A/B prototype, not the same runtime as the deterministic package documented here.
 
 ### Desktop experience
 

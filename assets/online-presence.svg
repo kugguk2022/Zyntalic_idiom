@@ -1,9 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" role="img" aria-labelledby="title desc">
   <title id="title">Online presence</title>
-  <desc id="desc">A warm black badge with a white spiral and monospaced online wordmark.</desc>
-  <rect width="360" height="80" rx="8" fill="#171510"/>
+  <desc id="desc">A deep ocean-blue badge with a cyan spiral and ice-white monospaced online wordmark.</desc>
+  <defs>
+    <linearGradient id="ocean" x1="0" y1="0" x2="360" y2="80" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#080910"/>
+      <stop offset=".52" stop-color="#123b66"/>
+      <stop offset="1" stop-color="#4f7cff"/>
+    </linearGradient>
+  </defs>
+  <rect width="360" height="80" rx="8" fill="url(#ocean)"/>
   <path d="M35 42c-8-1-12-8-10-15 2-8 11-12 19-9 9 4 12 15 7 24-5 10-18 13-29 7-12-7-16-22-9-34"
-        fill="none" stroke="#f8f7f2" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="35" cy="31" r="5.5" fill="none" stroke="#f8f7f2" stroke-width="3"/>
-  <text x="63" y="51" fill="#f8f7f2" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="35" letter-spacing="1">nline</text>
+        fill="none" stroke="#22d3ee" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="35" cy="31" r="5.5" fill="none" stroke="#22d3ee" stroke-width="3"/>
+  <text x="63" y="51" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="35" letter-spacing="1">nline</text>
 </svg>
