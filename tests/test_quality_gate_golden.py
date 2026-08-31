@@ -1,8 +1,9 @@
 import hashlib
 import json
-import os
 import re
 from pathlib import Path
+
+import pytest
 
 from zyntalic.translator import translate_text
 
@@ -32,6 +33,10 @@ def _surface_and_ctx(target: str):
     return surface.strip(), f"⟦ctx:{tail}"
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="issue #9: mixed-script generator/golden contract requires reviewed resolution",
+)
 def test_golden_core_hashes_and_quality_gate(monkeypatch):
     # Force deterministic fallback path so this gate is stable in CI/dev machines.
     monkeypatch.setenv("ZYNTALIC_FAST", "1")

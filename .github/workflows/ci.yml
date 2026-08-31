@@ -34,13 +34,8 @@ jobs:
           else
             echo "No changed Python files to lint."
           fi
-      - name: Regression suite (known main failures tracked in issue 9)
-        run: |
-          pytest \
-            --deselect=tests/test_determinism.py::test_generate_entry_deterministic \
-            --deselect=tests/test_mirror_rules.py::test_strict_vocab_tokens_from_mapping \
-            --deselect=tests/test_quality_gate_golden.py::test_golden_core_hashes_and_quality_gate \
-            -q
+      - name: Regression suite
+        run: pytest -q -rxX
       - name: REST API and cache coverage
         run: |
           pytest \
@@ -52,15 +47,6 @@ jobs:
             --cov-report=term-missing \
             --cov-fail-under=80 \
             -q
-      - name: Report inherited failures (issue 9)
-        continue-on-error: true
-        run: |
-          pytest \
-            tests/test_determinism.py::test_generate_entry_deterministic \
-            tests/test_mirror_rules.py::test_strict_vocab_tokens_from_mapping \
-            tests/test_quality_gate_golden.py::test_golden_core_hashes_and_quality_gate \
-            -q
-
   frontend:
     runs-on: ubuntu-latest
     defaults:
