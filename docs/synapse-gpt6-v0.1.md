@@ -1,4 +1,4 @@
-# Zyntalic ∇ — Synapse GPT-6 adapter v0.1
+# Zyntalic ∇ — GPT-6 adapter v0.1
 
 Status: **experimental design branch**. This name identifies an adapter protocol, not a fine-tuned GPT-6 model or a claim about the model's internals.
 
@@ -34,6 +34,5 @@ Make the existing Zyntalic engine usable from ChatGPT and other model clients wi
 3. Implement a thin versioned JSON/MCP bridge, not a duplicate grammar.
 4. Keep an explicit human approval checkpoint for creative publication.
 5. Add regression fixtures for two-way translation, ambiguity, seed reproducibility, encoding and failure cases.
-6. Keep AndrosAIS evidence/medical research authoritative in its own provenance pipeline; Synapse may annotate, never invent scientific facts.
 
 Non-goals: retraining a foundation model, changing the default branch, deploying publicly, or introducing paid inference silently.
