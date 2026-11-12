@@ -1,0 +1,60 @@
+{
+  "title": "Zyntalic \u2014 Collaborative inquiry",
+  "participants": [
+    {
+      "id": "openai1",
+      "provider": "openai",
+      "model": null
+    },
+    {
+      "id": "openai2",
+      "provider": "openai",
+      "model": null
+    },
+    {
+      "id": "anthropic1",
+      "provider": "anthropic",
+      "model": null
+    },
+    {
+      "id": "anthropic2",
+      "provider": "anthropic",
+      "model": null
+    },
+    {
+      "id": "google1",
+      "provider": "google",
+      "model": null
+    },
+    {
+      "id": "google2",
+      "provider": "google",
+      "model": null
+    }
+  ],
+  "candidates": [
+    {
+      "id": "A",
+      "name": "Convergence",
+      "asset": "/static/convergence.svg",
+      "sha256": "ff4d0f7a024cdd1ad447693eb2fb012a8b5c998f1590ea74589fa93712f19fbb",
+      "authors": []
+    },
+    {
+      "id": "E",
+      "name": "Sunburst Convergence",
+      "asset": "/static/sunburst.svg",
+      "sha256": "ff84841ebf7b7c533225d0addc5cfdc1ec9374b9b5decf01ada7a91e40874049",
+      "authors": []
+    }
+  ],
+  "rules": {
+    "within_min": 2,
+    "across_min": 3,
+    "weights": [
+      3,
+      2,
+      1
+    ]
+  }
+}

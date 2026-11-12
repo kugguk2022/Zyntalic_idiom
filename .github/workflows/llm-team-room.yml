@@ -1,0 +1,16 @@
+name: LLM Team Room inquiry checks
+on:
+  pull_request:
+    paths: ['llm-team-room/**', '.github/workflows/llm-team-room.yml']
+  push:
+    paths: ['llm-team-room/**', '.github/workflows/llm-team-room.yml']
+jobs:
+  inquiry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest -v
+        working-directory: llm-team-room/space
