@@ -1,7 +1,7 @@
 # Zyntalic
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/kugguk2022/Zyntalic_idiom/main/zyntalic-flow/public/favicon.svg" alt="Zyntalic logo" width="360">
+  <img src="https://raw.githubusercontent.com/kugguk2022/Zyntalic_idiom/main/zyntalic-flow/public/brand/zyntalic-lockup.svg" alt="Zyntalic — Polyglot Arc" width="720">
 </p>
 
 <p align="center">
@@ -158,6 +158,7 @@ The [repository guide](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wi
 
 ## Wiki and documentation
 
+- [Logo and brand assets](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/branding.md) — Polyglot Arc SVGs, motion variant, and usage guidance.
 - [Project wiki](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/README.md) — the complete guide and reading map.
 - [Idea and vision](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/idea.md) — motivation and design intent.
 - [Core concepts](https://github.com/kugguk2022/Zyntalic_idiom/blob/main/wiki/core-concepts.md) — anchors, ordering, context tails, and deterministic generation.

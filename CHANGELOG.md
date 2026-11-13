@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Added direct PyPI installation instructions.
 
 ## Unreleased
+- Adopted the Polyglot Arc logo with standalone light, dark, monochrome, and animated SVGs, a vector wordmark lockup, and a simplified favicon. Updated the README and legacy UI favicon reference.
 - Added a comprehensive project wiki covering the idea, evolution, architecture,
   current capabilities, terminology, repository organization, and roadmap.
 - Reworked the public README around supported workflows, status, security, and
