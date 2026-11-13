@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - Added direct PyPI installation instructions.
 
 ## Unreleased
-- Adopted the Polyglot Arc logo with standalone light, dark, monochrome, and animated SVGs, a vector wordmark lockup, and a simplified favicon. Updated the README and legacy UI favicon reference.
+- Restored the supplied Signal Arc (2) and Polyglot Orbit (3) as separate logo designs, alternating every six seconds in the main SVG, wordmark lockup, and app header asset. Added individual static SVGs and an original-motion preview; updated the README and asset guide.
 - Added a comprehensive project wiki covering the idea, evolution, architecture,
   current capabilities, terminology, repository organization, and roadmap.
 - Reworked the public README around supported workflows, status, security, and
